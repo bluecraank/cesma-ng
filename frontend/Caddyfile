@@ -1,0 +1,28 @@
+{
+	# Certificates: set CESMA_SITE_ADDRESS to the DNS name. For intranet names without
+	# public DNS, "tls internal" below issues a certificate from Caddy's own CA.
+	admin off
+}
+
+{$CESMA_SITE_ADDRESS::443} {
+	tls {$CESMA_TLS:internal}
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
