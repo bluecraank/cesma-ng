@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { CheckIcon, ChevronUpDownIcon, MagnifyingGlassIcon, PlusIcon, SignalIcon, XMarkIcon } from '@heroicons/vue/20/solid'
+import { CheckIcon, ChevronUpDownIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, PlusIcon, SignalIcon, XMarkIcon } from '@heroicons/vue/20/solid'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { api, type Device } from '@/api/client'
+import { api, type Device, type DeviceHint } from '@/api/client'
 import DeviceFormDialog from '@/components/DeviceFormDialog.vue'
 import DiscoverDialog from '@/components/DiscoverDialog.vue'
 import { useConfirmDelete } from '@/composables/useConfirm'
 import { useJobWatcher } from '@/composables/useJobWatcher'
 import DeviceStatusTag from '@/components/DeviceStatusTag.vue'
+import SwitchIcon from '@/components/SwitchIcon.vue'
 import UiSpinner from '@/components/ui/UiSpinner.vue'
 import { useNotify } from '@/composables/useNotify'
 import { useAuthStore } from '@/stores/auth'
@@ -20,6 +21,9 @@ const auth = useAuthStore()
 const sites = useSitesStore()
 
 const devices = ref<Device[]>([])
+const hints = ref<DeviceHint[]>([])
+const hintsOf = (id: number): DeviceHint[] => hints.value.filter((h) => h.device_id === id)
+const devicesWithHints = computed(() => new Set(hints.value.map((h) => h.device_id)).size)
 const loading = ref(false)
 const search = ref('')
 const dialogOpen = ref(false)
@@ -40,15 +44,16 @@ async function reject(device: Device): Promise<void> {
   }
 }
 
-type SortKey = 'name' | 'hostname' | 'model' | 'firmware' | 'status' | 'last_seen_at'
+type SortKey = 'name' | 'ip_address' | 'dns_name' | 'model' | 'firmware' | 'status' | 'last_seen_at'
 const sortKey = ref<SortKey>('name')
 const sortAsc = ref(true)
 
-const canCreate = computed(() => auth.canAdmin(sites.currentId))
+const canCreate = computed(() => auth.can('devices.manage', sites.currentId))
 
 const columns = computed<{ key: SortKey; label: string }[]>(() => [
   { key: 'name', label: t('common.name') },
-  { key: 'hostname', label: t('device.hostname') },
+  { key: 'ip_address', label: t('device.ip') },
+  { key: 'dns_name', label: t('device.dns') },
   { key: 'model', label: t('device.model') },
   { key: 'firmware', label: t('device.firmware') },
   { key: 'status', label: t('device.status') },
@@ -59,9 +64,17 @@ async function load(): Promise<void> {
   if (sites.currentId === null) return
   loading.value = true
   await notify.run(async () => {
-    devices.value = await api.get<Device[]>('/devices', { site_id: sites.currentId })
+    ;[devices.value, hints.value] = await Promise.all([
+      api.get<Device[]>('/devices', { site_id: sites.currentId }),
+      api.get<DeviceHint[]>(`/sites/${sites.currentId}/device-hints`).catch(() => []),
+    ])
   })
   loading.value = false
+}
+
+/** 10.0.0.9 before 10.0.0.10 */
+function ipSortKey(ip: string | null): string {
+  return ip ? ip.split('.').map((part) => part.padStart(3, '0')).join('.') : '~'
 }
 
 function sortBy(key: SortKey): void {
@@ -73,11 +86,13 @@ const rows = computed(() => {
   const q = search.value.trim().toLowerCase()
   const filtered = q
     ? devices.value.filter((d) =>
-        [d.name, d.hostname, d.model_name, d.serial_number, d.firmware].some((v) => v?.toLowerCase().includes(q)),
+        [d.name, d.hostname, d.ip_address, d.dns_name, d.model_name, d.serial_number, d.firmware].some((v) => v?.toLowerCase().includes(q)),
       )
     : devices.value
   const dir = sortAsc.value ? 1 : -1
-  return [...filtered].sort((a, b) => String(a[sortKey.value] ?? '').localeCompare(String(b[sortKey.value] ?? ''), undefined, { numeric: true }) * dir)
+  const value = (d: Device): string =>
+    sortKey.value === 'ip_address' ? ipSortKey(d.ip_address) : String(d[sortKey.value] ?? '')
+  return [...filtered].sort((a, b) => value(a).localeCompare(value(b), undefined, { numeric: true }) * dir)
 })
 
 watch(() => sites.currentId, load, { immediate: true })
@@ -104,6 +119,10 @@ watch(() => sites.currentId, load, { immediate: true })
       </div>
     </div>
 
+    <p v-if="devicesWithHints" class="flex items-center gap-2 text-sm text-yellow-700 dark:text-yellow-400">
+      <ExclamationTriangleIcon class="size-4" /> {{ t('hints.summary', { n: devicesWithHints }) }}
+    </p>
+
     <div v-if="unconfirmed.length" class="rounded-xl bg-yellow-50 p-4 ring-1 ring-yellow-600/20 dark:bg-yellow-500/10 dark:ring-yellow-500/20">
       <p class="text-sm font-semibold text-yellow-800 dark:text-yellow-300">{{ t('discover.waiting', { n: unconfirmed.length }) }}</p>
       <ul class="mt-2 space-y-1.5">
@@ -123,6 +142,7 @@ watch(() => sites.currentId, load, { immediate: true })
       <table class="table">
         <thead>
           <tr>
+            <th class="w-12"><span class="sr-only">{{ t('device.model') }}</span></th>
             <th v-for="col in columns" :key="col.key">
               <button type="button" class="inline-flex items-center gap-1 uppercase hover:text-gray-900 dark:hover:text-white" @click="sortBy(col.key)">
                 {{ col.label }}
@@ -133,20 +153,35 @@ watch(() => sites.currentId, load, { immediate: true })
         </thead>
         <tbody>
           <tr v-for="d in rows" :key="d.id">
+            <td class="py-2">
+              <RouterLink :to="{ name: 'device', params: { id: d.id } }">
+                <SwitchIcon :model="d.model" :status="d.status" :title="`${t(`device.models.${d.model}`)} · ${t(`device.statuses.${d.status}`)}`" />
+              </RouterLink>
+            </td>
             <td>
               <RouterLink :to="{ name: 'device', params: { id: d.id } }" class="link">{{ d.name }}</RouterLink>
+              <RouterLink
+                v-if="hintsOf(d.id).length"
+                :to="{ name: 'device', params: { id: d.id }, query: { tab: 'details' } }"
+                class="ml-1.5 inline-flex align-middle"
+                :class="hintsOf(d.id).some((h) => h.level === 'error') ? 'text-red-500' : 'text-yellow-500'"
+                :title="hintsOf(d.id).map((h) => t(`hints.${h.code}.title`, { profile: h.detail })).join(' · ')"
+              >
+                <ExclamationTriangleIcon class="size-4" />
+              </RouterLink>
             </td>
-            <td class="font-mono text-xs">{{ d.hostname }}</td>
+            <td class="font-mono text-xs whitespace-nowrap">{{ d.ip_address ?? '—' }}</td>
+            <td class="max-w-56 truncate font-mono text-xs" :title="d.dns_name ?? ''">{{ d.dns_name ?? '—' }}</td>
             <td>{{ d.model_name || t(`device.models.${d.model}`) }}</td>
             <td>{{ d.firmware || '—' }}</td>
             <td><DeviceStatusTag :status="d.status" /></td>
             <td class="whitespace-nowrap tabular-nums">{{ formatDateTime(d.last_seen_at, locale) }}</td>
           </tr>
           <tr v-if="loading">
-            <td :colspan="columns.length" class="py-8"><UiSpinner class="mx-auto" /></td>
+            <td :colspan="columns.length + 1" class="py-8"><UiSpinner class="mx-auto" /></td>
           </tr>
           <tr v-else-if="!rows.length">
-            <td :colspan="columns.length" class="py-8 text-center text-gray-500">—</td>
+            <td :colspan="columns.length + 1" class="py-8 text-center text-gray-500">—</td>
           </tr>
         </tbody>
       </table>

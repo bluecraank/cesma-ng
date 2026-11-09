@@ -13,8 +13,8 @@ from app.models import (
     DeviceStatus,
     NotificationKind,
     NotificationSeverity,
+    Permission,
     PollTask,
-    SiteRole,
     SnmpVersion,
 )
 
@@ -38,7 +38,9 @@ class LoginRequest(BaseModel):
 
 class SiteRoleOut(ORM):
     site_id: int
-    role: SiteRole
+    role_id: int
+    role_name: str
+    permissions: list[str]
 
 
 class UserOut(ORM):
@@ -50,13 +52,31 @@ class UserOut(ORM):
     is_active: bool
     locale: str
     last_login_at: UtcDatetime | None
+    has_local_password: bool
     site_roles: list[SiteRoleOut]
 
 
 class UserUpdate(BaseModel):
     is_superadmin: bool | None = None
     is_active: bool | None = None
-    site_roles: dict[int, SiteRole] | None = None
+    #: site id -> role id
+    site_roles: dict[int, int] | None = None
+    #: emergency password for logins while LDAP is unreachable; "" removes it
+    local_password: str | None = Field(default=None, max_length=1024)
+
+
+class RoleIn(BaseModel):
+    name: str = Name
+    description: str = Field(default="", max_length=255)
+    permissions: list[Permission] = []
+
+
+class RoleOut(ORM):
+    id: int
+    name: str
+    description: str
+    permissions: list[str]
+    builtin: str | None
 
 
 class LocaleUpdate(BaseModel):
@@ -168,6 +188,10 @@ class DeviceOut(ORM):
     mac_address: str | None
     uptime_seconds: int | None
     last_seen_at: UtcDatetime | None
+    ip_address: str | None
+    dns_name: str | None
+    #: the model supports uploading SSH keys
+    supports_ssh_keys: bool
 
 
 # --- Audit -----------------------------------------------------------------------------------
@@ -359,7 +383,21 @@ class PortChangeIn(BaseModel):
     untagged: int | None = Field(default=None, ge=1, le=4094)
     tagged: list[int] | None = None
     clear_untagged: bool = False
+    #: tag / untag single VLANs, keeping the port's other tagged VLANs
+    add_tagged: list[Annotated[int, Field(ge=1, le=4094)]] = []
+    remove_tagged: list[Annotated[int, Field(ge=1, le=4094)]] = []
     profile_id: int | None = None  # apply a port profile (overrides VLAN/description fields)
+
+
+class RenameIn(BaseModel):
+    name: str = Field(min_length=1, max_length=63)
+
+
+class DeviceHintOut(ORM):
+    device_id: int
+    code: str
+    level: str
+    detail: str
 
 
 class ChangePlanOut(BaseModel):
@@ -461,6 +499,8 @@ class SshKeyIn(BaseModel):
 
 class SshKeyOut(ORM):
     id: int
+    user_id: int | None
+    owner: str | None
     description: str
     key: str
     fingerprint: str

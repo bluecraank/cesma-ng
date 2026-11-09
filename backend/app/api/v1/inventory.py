@@ -7,9 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.api.deps import AppSettings, CallerDep, Db, csrf_guard, get_secret_box
 from app.core.crypto import SecretBox
 from app.drivers.registry import detect
+from app.models import Permission
 from app.schemas import (
     DetectRequest,
     DetectResult,
+    DeviceHintOut,
     DeviceVlanOut,
     FdbEntryOut,
     LldpNeighborOut,
@@ -19,7 +21,8 @@ from app.schemas import (
     TopologyOut,
 )
 from app.services import credentials, inventory_query, polling
-from app.services.access import require_any_site_admin
+from app.services.access import require_permission_anywhere
+from app.services.device_hints import site_hints
 from app.services.devices import get_device
 from app.services.port_stats import port_statistics
 from app.services.reports import site_report
@@ -70,7 +73,7 @@ async def detect_model(
     box: Annotated[SecretBox, Depends(get_secret_box)],
 ) -> object:
     """Identify a switch before it is added (asks it via SNMP)."""
-    require_any_site_admin(caller.user)
+    require_permission_anywhere(caller.user, Permission.DEVICES_MANAGE)
     profile = (
         await credentials.get_profile(db, body.credential_profile_id)
         if body.credential_profile_id
@@ -81,6 +84,14 @@ async def detect_model(
         return await detect(polling.snmp_client(settings, body.hostname, creds, quick=True))
     except SnmpError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"No SNMP answer: {exc}") from exc
+
+
+@router.get("/sites/{site_id}/device-hints", response_model=list[DeviceHintOut])
+async def device_hints(
+    site_id: int, db: Db, caller: CallerDep, box: Annotated[SecretBox, Depends(get_secret_box)]
+) -> object:
+    """Setup problems per device: missing credentials, unreachable switches."""
+    return await site_hints(db, caller, box, site_id)
 
 
 @router.get("/sites/{site_id}/topology", response_model=TopologyOut)

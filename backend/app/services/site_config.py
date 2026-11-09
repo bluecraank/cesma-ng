@@ -21,14 +21,14 @@ from app.models import (
     Device,
     DeviceStatus,
     DeviceVlan,
+    Permission,
     Port,
     PortProfile,
     PortVlan,
-    SiteRole,
     SiteVlan,
 )
 from app.services import audit
-from app.services.access import require_site_role
+from app.services.access import require_permission, require_site_access
 from app.services.context import Caller, Runtime
 from app.services.device_access import device_writer
 from app.services.uplinks import uplink_port_ids
@@ -50,7 +50,7 @@ SITE_VLAN_FIELDS = (
 
 async def list_site_vlans(db: AsyncSession, caller: Caller, site_id: int) -> list[dict[str, Any]]:
     """Site VLANs with the number of switches that have them (and with a different name)."""
-    require_site_role(caller.user, site_id, SiteRole.VIEWER)
+    require_site_access(caller.user, site_id)
     vlans = (
         (
             await db.execute(
@@ -104,7 +104,7 @@ async def save_site_vlan(
     values: dict[str, Any],
     vlan_id: int | None = None,
 ) -> SiteVlan:
-    require_site_role(caller.user, site_id, SiteRole.ADMIN)
+    require_permission(caller.user, site_id, Permission.VLANS_MANAGE)
     _validate_vlan(values)
     vlan = await _site_vlan(db, site_id, vlan_id) if vlan_id else SiteVlan(site_id=site_id)
     before = {f: getattr(vlan, f, None) for f in SITE_VLAN_FIELDS}
@@ -132,7 +132,7 @@ async def save_site_vlan(
 
 
 async def delete_site_vlan(db: AsyncSession, caller: Caller, site_id: int, vlan_id: int) -> None:
-    require_site_role(caller.user, site_id, SiteRole.ADMIN)
+    require_permission(caller.user, site_id, Permission.VLANS_MANAGE)
     vlan = await _site_vlan(db, site_id, vlan_id)
     await db.delete(vlan)
     await audit.record(
@@ -149,7 +149,7 @@ async def _site_vlan(db: AsyncSession, site_id: int, vlan_id: int) -> SiteVlan:
 
 async def import_vlans_from_devices(db: AsyncSession, caller: Caller, site_id: int) -> int:
     """QoL: take over the VLANs that already exist on the site's switches (first setup)."""
-    require_site_role(caller.user, site_id, SiteRole.ADMIN)
+    require_permission(caller.user, site_id, Permission.VLANS_MANAGE)
     existing = set(
         (await db.execute(select(SiteVlan.vid).where(SiteVlan.site_id == site_id))).scalars()
     )
@@ -195,7 +195,7 @@ async def plan_vlan_sync(
     ``tag_uplinks`` also adds the wanted VLANs as tagged to every uplink (trunk/LAG) of the
     switch. It only ever adds VLANs to uplinks, it never removes any.
     """
-    require_site_role(caller.user, site_id, SiteRole.ADMIN)
+    require_permission(caller.user, site_id, Permission.VLANS_MANAGE)
     wanted = {
         v.vid: v
         for v in (
@@ -280,7 +280,7 @@ async def _uplink_tagging(db: AsyncSession, device: Device, vids: set[int]) -> l
 
 
 async def list_profiles(db: AsyncSession, caller: Caller, site_id: int) -> Sequence[PortProfile]:
-    require_site_role(caller.user, site_id, SiteRole.VIEWER)
+    require_site_access(caller.user, site_id)
     return (
         (
             await db.execute(
@@ -299,7 +299,7 @@ async def save_profile(
     values: dict[str, Any],
     profile_id: int | None = None,
 ) -> PortProfile:
-    require_site_role(caller.user, site_id, SiteRole.ADMIN)
+    require_permission(caller.user, site_id, Permission.VLANS_MANAGE)
     profile = await db.get(PortProfile, profile_id) if profile_id else PortProfile(site_id=site_id)
     if profile is None or profile.site_id != site_id:
         raise NotFoundError("Port profile not found")
@@ -321,7 +321,7 @@ async def save_profile(
 
 
 async def delete_profile(db: AsyncSession, caller: Caller, site_id: int, profile_id: int) -> None:
-    require_site_role(caller.user, site_id, SiteRole.ADMIN)
+    require_permission(caller.user, site_id, Permission.VLANS_MANAGE)
     profile = await db.get(PortProfile, profile_id)
     if profile is None or profile.site_id != site_id:
         raise NotFoundError("Port profile not found")

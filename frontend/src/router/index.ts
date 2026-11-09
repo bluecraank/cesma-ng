@@ -29,7 +29,8 @@ export const router = createRouter({
         { path: 'vlans', name: 'vlans', component: () => import('@/views/VlansView.vue') },
         { path: 'backups', name: 'backups', component: () => import('@/views/BackupsView.vue') },
         { path: 'reports', name: 'reports', component: () => import('@/views/ReportsView.vue') },
-        { path: 'jobs', name: 'jobs', component: () => import('@/views/JobsView.vue') },
+        { path: 'admin/jobs', name: 'jobs', component: () => import('@/views/JobsView.vue') },
+        { path: 'jobs', redirect: '/admin/jobs' },
         { path: 'audit', name: 'audit', component: () => import('@/views/AuditView.vue') },
         {
           path: 'notifications',
@@ -60,9 +61,15 @@ export const router = createRouter({
           meta: { superadmin: true },
         },
         {
+          // every user manages their own keys here
           path: 'admin/ssh-keys',
           name: 'admin-ssh-keys',
           component: () => import('@/views/admin/SshKeysView.vue'),
+        },
+        {
+          path: 'admin/roles',
+          name: 'admin-roles',
+          component: () => import('@/views/admin/RolesView.vue'),
           meta: { superadmin: true },
         },
         {

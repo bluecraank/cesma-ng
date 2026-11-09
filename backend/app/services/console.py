@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import DeviceError, ValidationFailedError
 from app.drivers.writers import WriteError
-from app.models import SiteRole
+from app.models import Permission
 from app.services import audit
 from app.services.context import Caller, Runtime
 from app.services.device_access import device_writer
@@ -40,7 +40,7 @@ def validate(command: str) -> str:
 async def run_command(
     db: AsyncSession, caller: Caller, runtime: Runtime, device_id: int, command: str
 ) -> str:
-    device = await get_device(db, caller, device_id, SiteRole.ADMIN)
+    device = await get_device(db, caller, device_id, Permission.CONSOLE)
     command = validate(command)
     await audit.record(
         db,

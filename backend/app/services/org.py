@@ -8,9 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.errors import ConflictError, NotFoundError
-from app.models import Building, Device, Room, Site, SiteRole
+from app.models import Building, Device, Permission, Room, Site
 from app.services import audit
-from app.services.access import require_site_role, require_superadmin, visible_site_ids
+from app.services.access import (
+    require_permission,
+    require_site_access,
+    require_superadmin,
+    visible_site_ids,
+)
 from app.services.context import Caller
 
 # --- Sites -----------------------------------------------------------------------------------
@@ -29,7 +34,7 @@ async def list_sites(db: AsyncSession, caller: Caller) -> Sequence[Site]:
 
 
 async def get_site(db: AsyncSession, caller: Caller, site_id: int) -> Site:
-    require_site_role(caller.user, site_id, SiteRole.VIEWER)
+    require_site_access(caller.user, site_id)
     site = await db.get(
         Site, site_id, options=[selectinload(Site.buildings).selectinload(Building.rooms)]
     )
@@ -49,7 +54,7 @@ async def create_site(db: AsyncSession, caller: Caller, name: str) -> Site:
 
 async def rename_site(db: AsyncSession, caller: Caller, site_id: int, name: str) -> Site:
     site = await get_site(db, caller, site_id)
-    require_site_role(caller.user, site_id, SiteRole.ADMIN)
+    require_permission(caller.user, site_id, Permission.DEVICES_MANAGE)
     old = site.name
     site.name = name
     await _flush_unique(db, f"Site '{name}' already exists")
@@ -79,7 +84,7 @@ async def delete_site(db: AsyncSession, caller: Caller, site_id: int) -> None:
 
 async def create_building(db: AsyncSession, caller: Caller, site_id: int, name: str) -> Building:
     await get_site(db, caller, site_id)
-    require_site_role(caller.user, site_id, SiteRole.ADMIN)
+    require_permission(caller.user, site_id, Permission.DEVICES_MANAGE)
     building = Building(site_id=site_id, name=name, rooms=[])
     db.add(building)
     await _flush_unique(db, f"Building '{name}' already exists")
@@ -93,7 +98,7 @@ async def _get_building(db: AsyncSession, caller: Caller, building_id: int) -> B
     building = await db.get(Building, building_id, options=[selectinload(Building.rooms)])
     if building is None:
         raise NotFoundError("Building not found")
-    require_site_role(caller.user, building.site_id, SiteRole.ADMIN)
+    require_permission(caller.user, building.site_id, Permission.DEVICES_MANAGE)
     return building
 
 
@@ -149,7 +154,7 @@ async def _get_room(db: AsyncSession, caller: Caller, room_id: int) -> tuple[Roo
     if row is None:
         raise NotFoundError("Room not found")
     room, site_id = row
-    require_site_role(caller.user, site_id, SiteRole.ADMIN)
+    require_permission(caller.user, site_id, Permission.DEVICES_MANAGE)
     return room, site_id
 
 

@@ -1,4 +1,4 @@
-"""Super administrator endpoints: users and credential profiles."""
+"""Super administrator endpoints: users, roles and credential profiles."""
 
 from typing import Annotated
 
@@ -7,7 +7,14 @@ from fastapi import APIRouter, Depends, status
 from app.api.deps import CallerDep, Db, csrf_guard, get_secret_box
 from app.core.crypto import SecretBox
 from app.models import CredentialProfile
-from app.schemas import CredentialProfileIn, CredentialProfileOut, UserOut, UserUpdate
+from app.schemas import (
+    CredentialProfileIn,
+    CredentialProfileOut,
+    RoleIn,
+    RoleOut,
+    UserOut,
+    UserUpdate,
+)
 from app.services import credentials, users
 
 router = APIRouter(tags=["administration"], dependencies=[Depends(csrf_guard)])
@@ -23,6 +30,26 @@ async def list_users(db: Db, caller: CallerDep) -> object:
 @router.patch("/users/{user_id}", response_model=UserOut)
 async def update_user(user_id: int, body: UserUpdate, db: Db, caller: CallerDep) -> object:
     return await users.update_user(db, caller, user_id, **body.model_dump(exclude_unset=True))
+
+
+@router.get("/roles", response_model=list[RoleOut])
+async def list_roles(db: Db, caller: CallerDep) -> object:
+    return await users.list_roles(db, caller)
+
+
+@router.post("/roles", response_model=RoleOut, status_code=status.HTTP_201_CREATED)
+async def create_role(body: RoleIn, db: Db, caller: CallerDep) -> object:
+    return await users.save_role(db, caller, body.model_dump())
+
+
+@router.put("/roles/{role_id}", response_model=RoleOut)
+async def update_role(role_id: int, body: RoleIn, db: Db, caller: CallerDep) -> object:
+    return await users.save_role(db, caller, body.model_dump(), role_id)
+
+
+@router.delete("/roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_role(role_id: int, db: Db, caller: CallerDep) -> None:
+    await users.delete_role(db, caller, role_id)
 
 
 def _profile_out(profile: CredentialProfile, box: SecretBox) -> CredentialProfileOut:

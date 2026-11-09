@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { api, type SiteRole, type User } from '@/api/client'
+import { api, type Permission, type User } from '@/api/client'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
@@ -28,15 +28,27 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
-  function roleFor(siteId: number): SiteRole | null {
-    if (!user.value) return null
-    if (user.value.is_superadmin) return 'admin'
-    return user.value.site_roles.find((r) => r.site_id === siteId)?.role ?? null
+  /** Every role on a site allows seeing it; the role's permissions allow the rest. */
+  function hasSite(siteId: number | null | undefined): boolean {
+    if (!user.value || siteId == null) return false
+    return user.value.is_superadmin || user.value.site_roles.some((r) => r.site_id === siteId)
   }
 
-  function canAdmin(siteId: number | null | undefined): boolean {
-    return siteId != null && roleFor(siteId) === 'admin'
+  function can(permission: Permission, siteId: number | null | undefined): boolean {
+    if (!user.value || siteId == null) return false
+    if (user.value.is_superadmin) return true
+    const role = user.value.site_roles.find((r) => r.site_id === siteId)
+    return role?.permissions.includes(permission) ?? false
   }
 
-  return { user, loaded, isSuperadmin, load, login, logout, roleFor, canAdmin }
+  function canAnywhere(permission: Permission): boolean {
+    if (!user.value) return false
+    return user.value.is_superadmin || user.value.site_roles.some((r) => r.permissions.includes(permission))
+  }
+
+  function roleName(siteId: number): string | null {
+    return user.value?.site_roles.find((r) => r.site_id === siteId)?.role_name ?? null
+  }
+
+  return { user, loaded, isSuperadmin, load, login, logout, hasSite, can, canAnywhere, roleName }
 })

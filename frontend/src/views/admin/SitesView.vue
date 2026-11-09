@@ -65,7 +65,7 @@ async function remove(name: string, path: string): Promise<void> {
           <h2 class="flex items-center gap-2 text-base font-semibold">
             <MapPinIcon class="size-5 text-indigo-500" /> {{ site.name }}
           </h2>
-          <div v-if="auth.canAdmin(site.id)" class="flex items-center gap-1">
+          <div v-if="auth.can('devices.manage', site.id)" class="flex items-center gap-1">
             <button type="button" class="btn btn-ghost btn-sm" @click="openDialog(t('sites.newBuilding'), (name) => api.post(`/sites/${site.id}/buildings`, { name }))">
               <PlusIcon class="size-4" /> {{ t('sites.newBuilding') }}
             </button>
@@ -84,7 +84,7 @@ async function remove(name: string, path: string): Promise<void> {
               <span class="flex items-center gap-2 text-sm font-medium">
                 <BuildingOffice2Icon class="size-5 text-gray-400" /> {{ building.name }}
               </span>
-              <div v-if="auth.canAdmin(site.id)" class="flex items-center gap-1">
+              <div v-if="auth.can('devices.manage', site.id)" class="flex items-center gap-1">
                 <button type="button" class="btn btn-ghost btn-sm" @click="openDialog(t('sites.newRoom'), (name) => api.post(`/buildings/${building.id}/rooms`, { name }))">
                   <PlusIcon class="size-4" /> {{ t('sites.newRoom') }}
                 </button>
@@ -101,7 +101,7 @@ async function remove(name: string, path: string): Promise<void> {
                 <span class="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                   <CubeIcon class="size-4 text-gray-400" /> {{ room.name }}
                 </span>
-                <div v-if="auth.canAdmin(site.id)" class="flex items-center gap-1">
+                <div v-if="auth.can('devices.manage', site.id)" class="flex items-center gap-1">
                   <button type="button" class="btn-icon" :title="t('common.edit')" @click="openDialog(room.name, (name) => api.patch(`/rooms/${room.id}`, { name }), room.name)">
                     <PencilSquareIcon class="size-4" />
                   </button>

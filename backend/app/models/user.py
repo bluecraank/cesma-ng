@@ -6,12 +6,42 @@ from enum import StrEnum
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.db import Base, TimestampMixin, str_enum, utcnow
+from app.core.db import Base, JsonType, TimestampMixin, utcnow
 
 
-class SiteRole(StrEnum):
+class Permission(StrEnum):
+    """What a role allows on a site, beyond seeing it (every role may see and poll)."""
+
+    DEVICES_MANAGE = "devices.manage"  # devices, buildings, rooms, discovery
+    PORTS_EDIT = "ports.edit"  # description, enabled, VLANs of ports
+    VLANS_MANAGE = "vlans.manage"  # site VLANs, port profiles, VLAN sync
+    BACKUPS_RUN = "backups.run"
+    BACKUPS_READ = "backups.read"  # download and compare (contains switch secrets)
+    BACKUPS_RESTORE = "backups.restore"
+    CONSOLE = "console"  # read-only commands on the switch
+    SSH_KEYS_PUSH = "ssh_keys.push"  # upload SSH keys to the switches
+    SSH_LOGIN = "ssh.login"  # the user's own SSH keys are uploaded to the switches
+
+
+class BuiltinRole(StrEnum):
     VIEWER = "viewer"
     ADMIN = "admin"
+
+
+class Role(TimestampMixin, Base):
+    """A named set of permissions, assigned to users per site."""
+
+    __tablename__ = "roles"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    description: Mapped[str] = mapped_column(String(255), default="")
+    permissions: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    #: built-in roles ("viewer", "admin") cannot be deleted
+    builtin: Mapped[str | None] = mapped_column(String(20), unique=True)
+
+    def allows(self, permission: Permission) -> bool:
+        return permission.value in self.permissions
 
 
 class User(TimestampMixin, Base):
@@ -25,10 +55,16 @@ class User(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(default=True)
     locale: Mapped[str] = mapped_column(String(5), default="de")
     last_login_at: Mapped[datetime | None]
+    #: emergency password, only accepted while the directory (LDAP) is unreachable
+    local_password_hash: Mapped[str | None] = mapped_column(String(255))
 
     site_roles: Mapped[list["UserSiteRole"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
+
+    @property
+    def has_local_password(self) -> bool:
+        return self.local_password_hash is not None
 
 
 class UserSiteRole(Base):
@@ -40,9 +76,18 @@ class UserSiteRole(Base):
     site_id: Mapped[int] = mapped_column(
         ForeignKey("sites.id", ondelete="CASCADE"), primary_key=True
     )
-    role: Mapped[SiteRole] = mapped_column(str_enum(SiteRole, 20))
+    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="RESTRICT"))
 
     user: Mapped[User] = relationship(back_populates="site_roles")
+    role: Mapped[Role] = relationship(lazy="selectin")
+
+    @property
+    def role_name(self) -> str:
+        return self.role.name
+
+    @property
+    def permissions(self) -> list[str]:
+        return list(self.role.permissions)
 
 
 class UserSession(Base):

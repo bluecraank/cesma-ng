@@ -76,7 +76,17 @@ class Device(TimestampMixin, Base):
     mac_address: Mapped[str | None] = mapped_column(String(17))
     uptime_seconds: Mapped[int | None]
     last_seen_at: Mapped[datetime | None]
+    #: resolved from ``hostname`` by the worker: the IP if hostname is a name, else reverse DNS
+    ip_address: Mapped[str | None] = mapped_column(String(45))
+    dns_name: Mapped[str | None] = mapped_column(String(255))
+    address_checked_at: Mapped[datetime | None]
 
     site: Mapped[Site] = relationship()
     room: Mapped[Room | None] = relationship()
     credential_profile: Mapped[CredentialProfile | None] = relationship()
+
+    @property
+    def supports_ssh_keys(self) -> bool:
+        from app.drivers.registry import WRITERS
+
+        return WRITERS[self.model].supports_ssh_keys

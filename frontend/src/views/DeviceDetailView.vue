@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { ArrowPathIcon, ChevronLeftIcon, PencilSquareIcon, TrashIcon } from '@heroicons/vue/20/solid'
+import { ArrowPathIcon, ChevronLeftIcon, KeyIcon, PencilSquareIcon, TagIcon, TrashIcon } from '@heroicons/vue/20/solid'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { api, type Backup, type Device, type DeviceVlan, type FdbEntry, type LldpNeighbor, type PollState, type Port } from '@/api/client'
+import { api, type Backup, type Device, type DeviceHint, type DeviceVlan, type FdbEntry, type Job, type LldpNeighbor, type PollState, type Port } from '@/api/client'
 import DeviceFormDialog from '@/components/DeviceFormDialog.vue'
 import BackupList from '@/components/BackupList.vue'
 import ConsoleTab from '@/components/device/ConsoleTab.vue'
+import DeviceHints from '@/components/DeviceHints.vue'
 import DeviceStatusTag from '@/components/DeviceStatusTag.vue'
 import PortsTab from '@/components/device/PortsTab.vue'
+import RenameDialog from '@/components/device/RenameDialog.vue'
 import SimpleTabs from '@/components/device/SimpleTabs.vue'
-import { useConfirmDelete } from '@/composables/useConfirm'
+import { useConfirm, useConfirmDelete } from '@/composables/useConfirm'
+import { useJobWatcher } from '@/composables/useJobWatcher'
 import { useNotify } from '@/composables/useNotify'
 import { useAuthStore } from '@/stores/auth'
 import { useSitesStore } from '@/stores/sites'
@@ -23,6 +26,8 @@ const props = defineProps<{ id: number }>()
 const { t, locale } = useI18n()
 const notify = useNotify()
 const confirmDelete = useConfirmDelete()
+const { confirm } = useConfirm()
+const { watch: watchJob } = useJobWatcher()
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
@@ -35,7 +40,9 @@ const fdb = ref<FdbEntry[]>([])
 const lldp = ref<LldpNeighbor[]>([])
 const poll = ref<PollState[]>([])
 const backups = ref<Backup[]>([])
+const hints = ref<DeviceHint[]>([])
 const editOpen = ref(false)
+const renameOpen = ref(false)
 const refreshing = ref(false)
 
 // The tab lives in the URL so links and reloads keep it.
@@ -54,12 +61,16 @@ const tabLabels = computed<Record<Tab, string>>(() => ({
   details: t('device.details'),
 }))
 
-const canAdmin = computed(() => auth.canAdmin(device.value?.site_id))
-// The console is for administrators only.
-const TABS = computed(() => ALL_TABS.filter((name) => name !== 'console' || canAdmin.value))
+const siteId = computed(() => device.value?.site_id)
+const canManage = computed(() => auth.can('devices.manage', siteId.value))
+const canEditPorts = computed(() => auth.can('ports.edit', siteId.value))
+const canPushKeys = computed(() => auth.can('ssh_keys.push', siteId.value) && !!device.value?.supports_ssh_keys)
+const TABS = computed(() => ALL_TABS.filter((name) => name !== 'console' || auth.can('console', siteId.value)))
 const roomLabel = computed(
   () => sites.rooms(device.value?.site_id ?? null).find((r) => r.id === device.value?.room_id)?.label,
 )
+// ?port=<id> scrolls to that port (links from the client list)
+const focusPortId = computed(() => (route.query.port ? Number(route.query.port) : null))
 const portsUp = computed(() => ports.value.filter((p) => p.oper_up).length)
 
 const facts = computed(() => {
@@ -67,6 +78,8 @@ const facts = computed(() => {
   if (!d) return []
   return [
     { label: t('device.hostname'), value: d.hostname, mono: true },
+    { label: t('device.ip'), value: d.ip_address, mono: true },
+    { label: t('device.dns'), value: d.dns_name, mono: true },
     { label: t('device.model'), value: d.model_name || t(`device.models.${d.model}`) },
     { label: t('device.firmware'), value: d.firmware },
     { label: t('device.serial'), value: d.serial_number, mono: true },
@@ -98,6 +111,7 @@ async function load(): Promise<void> {
     lldp.value = l
     poll.value = s
     backups.value = b
+    hints.value = (await api.get<DeviceHint[]>(`/sites/${d.site_id}/device-hints`).catch(() => [])).filter((h) => h.device_id === d.id)
   })
 }
 
@@ -116,6 +130,24 @@ async function refresh(): Promise<void> {
   }
 }
 onUnmounted(() => clearTimeout(reloadTimer))
+
+/** Uploads the SSH keys of all users with SSH access to this site onto this one switch. */
+async function pushKeys(): Promise<void> {
+  const d = device.value
+  if (!d) return
+  const ok = await confirm({
+    title: t('sshKeys.push'),
+    message: t('sshKeys.pushDevice', { device: d.name }),
+    confirmLabel: t('sshKeys.push'),
+    cancelLabel: t('common.cancel'),
+    danger: true,
+  })
+  if (!ok) return
+  await notify.run(async () => {
+    watchJob(await api.post<Job>('/jobs', { kind: 'ssh_keys', site_id: d.site_id, device_ids: [d.id] }))
+    notify.success(t('sshKeys.pushed'))
+  })
+}
 
 async function remove(): Promise<void> {
   const d = device.value
@@ -151,7 +183,13 @@ watch(() => props.id, load, { immediate: true })
         <button type="button" class="btn btn-secondary" :disabled="refreshing" @click="refresh">
           <ArrowPathIcon class="size-4" :class="{ 'animate-spin': refreshing }" /> {{ t('poll.refresh') }}
         </button>
-        <template v-if="canAdmin">
+        <button v-if="canPushKeys" type="button" class="btn btn-secondary" @click="pushKeys">
+          <KeyIcon class="size-4" /> {{ t('sshKeys.pushOne') }}
+        </button>
+        <template v-if="canManage">
+          <button type="button" class="btn btn-secondary" @click="renameOpen = true">
+            <TagIcon class="size-4" /> {{ t('rename.title') }}
+          </button>
           <button type="button" class="btn btn-secondary" @click="editOpen = true">
             <PencilSquareIcon class="size-4" /> {{ t('common.edit') }}
           </button>
@@ -161,6 +199,8 @@ watch(() => props.id, load, { immediate: true })
         </template>
       </div>
     </div>
+
+    <DeviceHints :hints="hints" />
 
     <nav class="-mb-px flex gap-6 overflow-x-auto border-b border-gray-200 dark:border-white/10">
       <button
@@ -185,11 +225,12 @@ watch(() => props.id, load, { immediate: true })
       :site-id="device.site_id"
       :ports="ports"
       :vlans="vlans"
-      :can-edit="canAdmin"
+      :can-edit="canEditPorts"
+      :focus-port-id="focusPortId"
       @changed="load"
     />
     <ConsoleTab v-else-if="tab === 'console'" :device-id="device.id" :model="device.model" />
-    <BackupList v-else-if="tab === 'backups'" :backups="backups" :can-download="() => canAdmin" />
+    <BackupList v-else-if="tab === 'backups'" :backups="backups" />
     <SimpleTabs v-else-if="tab !== 'details'" :tab="tab" :vlans="vlans" :fdb="fdb" :lldp="lldp" :poll="poll" />
     <section v-else class="card">
       <dl class="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-3 dark:divide-white/5">
@@ -200,6 +241,7 @@ watch(() => props.id, load, { immediate: true })
       </dl>
     </section>
 
+    <RenameDialog v-model:open="renameOpen" :device="device" @renamed="load" />
     <DeviceFormDialog v-model:open="editOpen" :device="device" @saved="(d) => (device = d)" />
   </div>
 </template>

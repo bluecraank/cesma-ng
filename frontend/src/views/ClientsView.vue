@@ -114,8 +114,15 @@ watch(
               <td class="max-w-48 truncate text-xs" :title="c.vendor ?? ''">{{ c.vendor ?? '' }}</td>
               <td class="tabular-nums">{{ c.vid ?? '' }}</td>
               <td class="whitespace-nowrap">
-                <RouterLink v-if="c.device_id" :to="{ name: 'device', params: { id: c.device_id } }" class="link">{{ c.device_name }}</RouterLink>
-                <span class="ml-1 font-mono text-xs">{{ c.port_name }}</span>
+                <RouterLink
+                  v-if="c.device_id"
+                  :to="{ name: 'device', params: { id: c.device_id }, query: { tab: 'ports', ...(c.port_id ? { port: c.port_id } : {}) } }"
+                  class="link"
+                  :title="t('clients.toPort')"
+                >
+                  {{ c.device_name }} <span class="font-mono text-xs">{{ c.port_name }}</span>
+                </RouterLink>
+                <span v-else class="ml-1 font-mono text-xs">{{ c.port_name }}</span>
               </td>
               <td class="whitespace-nowrap">
                 <span v-if="c.active" class="badge badge-green">{{ t('clients.active') }}</span>

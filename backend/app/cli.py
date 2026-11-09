@@ -2,8 +2,9 @@
 
 import argparse
 import asyncio
+import getpass
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.config import get_settings
 from app.core.db import Database
@@ -27,6 +28,33 @@ async def _set_superadmin(db: Database, username: str, value: bool) -> None:
         user.is_superadmin = value
         await session.commit()
         print(f"{username}: superadmin={value}")
+
+
+async def _set_password(db: Database, username: str, superadmin: bool) -> None:
+    """Emergency password; creates the user if it has never logged in (LDAP not working yet)."""
+    from app.auth.passwords import MIN_LENGTH, hash_password
+
+    password = getpass.getpass(f"Emergency password for {username} (min. {MIN_LENGTH} chars): ")
+    if len(password) < MIN_LENGTH:
+        raise SystemExit(f"At least {MIN_LENGTH} characters required")
+    if getpass.getpass("Repeat: ") != password:
+        raise SystemExit("The passwords do not match")
+    async with db.sessionmaker() as session:
+        user = (
+            await session.execute(select(User).where(User.username == username))
+        ).scalar_one_or_none()
+        if user is None:
+            first = (await session.scalar(select(func.count()).select_from(User))) == 0
+            user = User(username=username, is_superadmin=first or superadmin, site_roles=[])
+            session.add(user)
+            print(
+                f"User {username} created{' as super administrator' if user.is_superadmin else ''}"
+            )
+        elif superadmin:
+            user.is_superadmin = True
+        user.local_password_hash = hash_password(password)
+        await session.commit()
+    print(f"{username}: emergency password set (only accepted while LDAP is not reachable)")
 
 
 async def _import_legacy(db: Database, args: argparse.Namespace) -> None:
@@ -58,6 +86,11 @@ def main() -> None:
     p = sub.add_parser("set-superadmin", help="Grant or revoke super administrator rights")
     p.add_argument("username")
     p.add_argument("--revoke", action="store_true")
+    pw = sub.add_parser(
+        "set-password", help="Set an emergency password (login while LDAP is not reachable)"
+    )
+    pw.add_argument("username")
+    pw.add_argument("--superadmin", action="store_true", help="also make the user superadmin")
     imp = sub.add_parser("import-legacy", help="Import data from cesma-on-premise (MySQL)")
     imp.add_argument("--mysql", required=True, help="mysql://user:password@host:3306/cesma")
     imp.add_argument("--app-key", required=True, help="APP_KEY of cesma-on-premise (base64:...)")
@@ -73,6 +106,8 @@ def main() -> None:
                 await _list_users(db)
             elif args.command == "set-superadmin":
                 await _set_superadmin(db, args.username, not args.revoke)
+            elif args.command == "set-password":
+                await _set_password(db, args.username, args.superadmin)
             elif args.command == "import-legacy":
                 await _import_legacy(db, args)
         finally:

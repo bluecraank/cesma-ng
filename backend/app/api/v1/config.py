@@ -19,13 +19,14 @@ from app.schemas import (
     PortChangeIn,
     PortProfileIn,
     PortProfileOut,
+    RenameIn,
     SiteVlanIn,
     SiteVlanOut,
     SshKeyIn,
     SshKeyOut,
     VlanSyncIn,
 )
-from app.services import backups, jobs, port_config, site_config, ssh_keys
+from app.services import backups, device_rename, jobs, port_config, site_config, ssh_keys
 from app.services.console import run_command
 from app.services.context import Caller
 from app.services.devices import get_device
@@ -63,6 +64,8 @@ async def _port_change(db: Db, caller: Caller, device_id: int, body: PortChangeI
         untagged=body.untagged,
         tagged=frozenset(body.tagged) if body.tagged is not None else None,
         clear_untagged=body.clear_untagged,
+        add_tagged=frozenset(body.add_tagged),
+        remove_tagged=frozenset(body.remove_tagged),
     )
 
 
@@ -88,6 +91,21 @@ async def apply_ports(
     plan, log = await port_config.apply_port_change(
         db, caller, runtime, device_id, body.port_ids, change
     )
+    return {"plan": _plan_out(plan), "log": log}
+
+
+@router.post("/devices/{device_id}/rename/plan", response_model=ChangePlanOut)
+async def plan_rename(
+    device_id: int, body: RenameIn, db: Db, caller: CallerDep, runtime: RuntimeDep
+) -> object:
+    return _plan_out(await device_rename.plan_rename(db, caller, runtime, device_id, body.name))
+
+
+@router.post("/devices/{device_id}/rename/apply", response_model=ApplyResult)
+async def apply_rename(
+    device_id: int, body: RenameIn, db: Db, caller: CallerDep, runtime: RuntimeDep
+) -> object:
+    plan, log = await device_rename.apply_rename(db, caller, runtime, device_id, body.name)
     return {"plan": _plan_out(plan), "log": log}
 
 
@@ -235,8 +253,9 @@ async def get_job(job_id: int, db: Db, caller: CallerDep) -> object:
 
 
 @router.get("/ssh-keys", response_model=list[SshKeyOut])
-async def list_keys(db: Db, caller: CallerDep) -> object:
-    return await ssh_keys.list_keys(db, caller)
+async def list_keys(db: Db, caller: CallerDep, all_users: bool = False) -> object:
+    """The caller's own keys; ``all_users`` (super administrators) lists everyone's."""
+    return await ssh_keys.list_keys(db, caller, all_users=all_users)
 
 
 @router.post("/ssh-keys", response_model=SshKeyOut, status_code=status.HTTP_201_CREATED)

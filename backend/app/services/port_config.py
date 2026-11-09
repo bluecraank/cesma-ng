@@ -16,7 +16,7 @@ from app.domain.changes import (
     SetPortVlans,
 )
 from app.drivers.writers import WriteError
-from app.models import AuditLevel, Device, DeviceVlan, Port, PortVlan, SiteRole
+from app.models import AuditLevel, Device, DeviceVlan, Permission, Port, PortVlan
 from app.services import audit, polling
 from app.services.context import Caller, Runtime
 from app.services.device_access import device_writer
@@ -36,10 +36,18 @@ class PortChange:
     tagged: frozenset[int] | None = None
     #: set untagged to "none" explicitly (``untagged=None`` alone means unchanged)
     clear_untagged: bool = False
+    #: tag / untag single VLANs and keep the others (editing several ports at once)
+    add_tagged: frozenset[int] = frozenset()
+    remove_tagged: frozenset[int] = frozenset()
 
     @property
     def touches_vlans(self) -> bool:
-        return self.untagged is not None or self.tagged is not None or self.clear_untagged
+        return (
+            self.untagged is not None
+            or self.tagged is not None
+            or self.clear_untagged
+            or bool(self.add_tagged or self.remove_tagged)
+        )
 
 
 @dataclass
@@ -59,6 +67,7 @@ def _operations(port: Port, change: PortChange) -> list[Operation]:
         before_tagged = frozenset(v.vid for v in port.vlans if v.tagged)
         untagged = None if change.clear_untagged else (change.untagged or before_untagged)
         tagged = change.tagged if change.tagged is not None else before_tagged
+        tagged = (tagged | change.add_tagged) - change.remove_tagged
         tagged = frozenset(tagged - {untagged} if untagged else tagged)
         if (untagged, tagged) != (before_untagged, before_tagged):
             ops.append(SetPortVlans(port.name, untagged, tagged, before_untagged, before_tagged))
@@ -73,7 +82,7 @@ async def plan_port_change(
     port_ids: Sequence[int],
     change: PortChange,
 ) -> PortPlan:
-    device = await get_device(db, caller, device_id, SiteRole.ADMIN)
+    device = await get_device(db, caller, device_id, Permission.PORTS_EDIT)
     if not port_ids:
         raise ValidationFailedError("No port selected")
     ports = (
@@ -117,7 +126,8 @@ async def _warnings(
                 await db.execute(select(DeviceVlan.vid).where(DeviceVlan.device_id == device.id))
             ).scalars()
         )
-        wanted = set(change.tagged or ()) | ({change.untagged} if change.untagged else set())
+        wanted = set(change.tagged or ()) | set(change.add_tagged)
+        wanted |= {change.untagged} if change.untagged else set()
         if missing := sorted(wanted - existing):
             warnings.append(f"VLAN(s) {', '.join(map(str, missing))} do not exist on {device.name}")
     return warnings
@@ -135,7 +145,7 @@ async def apply_port_change(
     plan = result.plan
     if plan.empty:
         return plan, []
-    device = await get_device(db, caller, device_id, SiteRole.ADMIN)
+    device = await get_device(db, caller, device_id, Permission.PORTS_EDIT)
     writer = await device_writer(db, runtime, device)
     before = {p.name: _port_state(p) for p in result.ports}
     try:

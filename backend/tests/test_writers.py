@@ -9,6 +9,7 @@ from app.domain.changes import (
     CreateVlan,
     DeleteVlan,
     RenameVlan,
+    SetHostname,
     SetPortDescription,
     SetPortEnabled,
     SetPortVlans,
@@ -254,3 +255,11 @@ async def test_arubaos_restore_failure_is_reported() -> None:
 async def test_dell_has_no_restore() -> None:
     with pytest.raises(WriteError, match="not supported"):
         await DnosCliWriter("sw", CREDS).restore("x")
+
+
+def test_hostname_on_every_model() -> None:
+    op = [SetHostname("sw-eg-01")]
+    assert DnosCliWriter("sw", CREDS).render(op) == ['hostname "sw-eg-01"']
+    assert Os10CliWriter("sw", CREDS).render(op) == ["hostname sw-eg-01"]
+    assert ArubaOsRestWriter("sw", CREDS).render(op) == ['PUT /system {"name": "sw-eg-01"}']
+    assert ArubaCxRestWriter("sw", CREDS).render(op) == ['PATCH /system {"hostname": "sw-eg-01"}']

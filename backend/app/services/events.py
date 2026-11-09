@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import utcnow
 from app.core.errors import NotFoundError
-from app.models import Device, Port, SiteRole
+from app.models import Device, Port
 from app.models.notification import Notification, NotificationKind, NotificationSeverity
-from app.services.access import require_site_role, visible_site_ids
+from app.services.access import require_site_access, visible_site_ids
 from app.services.context import Caller
 from app.services.inventory import InventoryChanges
 from app.services.uplinks import uplink_port_ids
@@ -100,13 +100,13 @@ async def acknowledge(db: AsyncSession, caller: Caller, notification_id: int) ->
     if n is None:
         raise NotFoundError("Notification not found")
     if n.site_id is not None:
-        require_site_role(caller.user, n.site_id, SiteRole.VIEWER)
+        require_site_access(caller.user, n.site_id)
     n.acknowledged_at = utcnow()
     n.acknowledged_by = caller.user.username
 
 
 async def acknowledge_all(db: AsyncSession, caller: Caller, site_id: int) -> None:
-    require_site_role(caller.user, site_id, SiteRole.VIEWER)
+    require_site_access(caller.user, site_id)
     await db.execute(
         update(Notification)
         .where(and_(Notification.site_id == site_id, Notification.acknowledged_at.is_(None)))

@@ -24,6 +24,8 @@ async def search(db: AsyncSession, caller: Caller, query: str) -> list[dict[str,
         or_(
             Device.name.ilike(f"%{q}%"),
             Device.hostname.ilike(f"%{q}%"),
+            Device.ip_address.ilike(f"%{q}%"),
+            Device.dns_name.ilike(f"%{q}%"),
             Device.sys_name.ilike(f"%{q}%"),
             Device.serial_number.ilike(f"%{q}%"),
             Device.mac_address == q.lower(),

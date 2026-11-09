@@ -361,6 +361,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sites/{site_id}/device-hints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Device Hints
+         * @description Setup problems per device: missing credentials, unreachable switches.
+         */
+        get: operations["device_hints_api_v1_sites__site_id__device_hints_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sites/{site_id}/topology": {
         parameters: {
             query?: never;
@@ -440,6 +460,40 @@ export interface paths {
         put?: never;
         /** Apply Ports */
         post: operations["apply_ports_api_v1_devices__device_id__ports_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/rename/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Plan Rename */
+        post: operations["plan_rename_api_v1_devices__device_id__rename_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/rename/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Rename */
+        post: operations["apply_rename_api_v1_devices__device_id__rename_apply_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -645,7 +699,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Keys */
+        /**
+         * List Keys
+         * @description The caller's own keys; ``all_users`` (super administrators) lists everyone's.
+         */
         get: operations["list_keys_api_v1_ssh_keys_get"];
         put?: never;
         /** Add Key */
@@ -896,6 +953,42 @@ export interface paths {
         head?: never;
         /** Update User */
         patch: operations["update_user_api_v1_users__user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Roles */
+        get: operations["list_roles_api_v1_roles_get"];
+        put?: never;
+        /** Create Role */
+        post: operations["create_role_api_v1_roles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/roles/{role_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Role */
+        put: operations["update_role_api_v1_roles__role_id__put"];
+        post?: never;
+        /** Delete Role */
+        delete: operations["delete_role_api_v1_roles__role_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/credential-profiles": {
@@ -1207,6 +1300,17 @@ export interface components {
             /** Model Name */
             model_name: string | null;
         };
+        /** DeviceHintOut */
+        DeviceHintOut: {
+            /** Device Id */
+            device_id: number;
+            /** Code */
+            code: string;
+            /** Level */
+            level: string;
+            /** Detail */
+            detail: string;
+        };
         /** DeviceIn */
         DeviceIn: {
             /** Name */
@@ -1264,6 +1368,12 @@ export interface components {
             uptime_seconds: number | null;
             /** Last Seen At */
             last_seen_at: string | null;
+            /** Ip Address */
+            ip_address: string | null;
+            /** Dns Name */
+            dns_name: string | null;
+            /** Supports Ssh Keys */
+            supports_ssh_keys: boolean;
         };
         /**
          * DeviceStatus
@@ -1529,6 +1639,12 @@ export interface components {
             total: number;
         };
         /**
+         * Permission
+         * @description What a role allows on a site, beyond seeing it (every role may see and poll).
+         * @enum {string}
+         */
+        Permission: "devices.manage" | "ports.edit" | "vlans.manage" | "backups.run" | "backups.read" | "backups.restore" | "console" | "ssh_keys.push" | "ssh.login";
+        /**
          * PoeStatus
          * @enum {string}
          */
@@ -1574,6 +1690,16 @@ export interface components {
              * @default false
              */
             clear_untagged: boolean;
+            /**
+             * Add Tagged
+             * @default []
+             */
+            add_tagged: number[];
+            /**
+             * Remove Tagged
+             * @default []
+             */
+            remove_tagged: number[];
             /** Profile Id */
             profile_id?: number | null;
         };
@@ -1685,6 +1811,39 @@ export interface components {
             /** Points */
             points: components["schemas"]["PortStatPoint"][];
         };
+        /** RenameIn */
+        RenameIn: {
+            /** Name */
+            name: string;
+        };
+        /** RoleIn */
+        RoleIn: {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Permissions
+             * @default []
+             */
+            permissions: components["schemas"]["Permission"][];
+        };
+        /** RoleOut */
+        RoleOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Permissions */
+            permissions: string[];
+            /** Builtin */
+            builtin: string | null;
+        };
         /** RoomOut */
         RoomOut: {
             /** Id */
@@ -1728,16 +1887,16 @@ export interface components {
             /** Buildings */
             buildings: components["schemas"]["BuildingOut"][];
         };
-        /**
-         * SiteRole
-         * @enum {string}
-         */
-        SiteRole: "viewer" | "admin";
         /** SiteRoleOut */
         SiteRoleOut: {
             /** Site Id */
             site_id: number;
-            role: components["schemas"]["SiteRole"];
+            /** Role Id */
+            role_id: number;
+            /** Role Name */
+            role_name: string;
+            /** Permissions */
+            permissions: string[];
         };
         /** SiteVlanIn */
         SiteVlanIn: {
@@ -1832,6 +1991,10 @@ export interface components {
         SshKeyOut: {
             /** Id */
             id: number;
+            /** User Id */
+            user_id: number | null;
+            /** Owner */
+            owner: string | null;
             /** Description */
             description: string;
             /** Key */
@@ -1901,6 +2064,8 @@ export interface components {
             locale: string;
             /** Last Login At */
             last_login_at: string | null;
+            /** Has Local Password */
+            has_local_password: boolean;
             /** Site Roles */
             site_roles: components["schemas"]["SiteRoleOut"][];
         };
@@ -1912,8 +2077,10 @@ export interface components {
             is_active?: boolean | null;
             /** Site Roles */
             site_roles?: {
-                [key: string]: components["schemas"]["SiteRole"];
+                [key: string]: number;
             } | null;
+            /** Local Password */
+            local_password?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -2802,6 +2969,37 @@ export interface operations {
             };
         };
     };
+    device_hints_api_v1_sites__site_id__device_hints_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceHintOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     topology_api_v1_sites__site_id__topology_get: {
         parameters: {
             query?: {
@@ -2949,6 +3147,76 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PortChangeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_rename_api_v1_devices__device_id__rename_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_rename_api_v1_devices__device_id__rename_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameIn"];
             };
         };
         responses: {
@@ -3499,7 +3767,9 @@ export interface operations {
     };
     list_keys_api_v1_ssh_keys_get: {
         parameters: {
-            query?: never;
+            query?: {
+                all_users?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3513,6 +3783,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SshKeyOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4083,6 +4362,123 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["UserOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_roles_api_v1_roles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleOut"][];
+                };
+            };
+        };
+    };
+    create_role_api_v1_roles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_role_api_v1_roles__role_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_role_api_v1_roles__role_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

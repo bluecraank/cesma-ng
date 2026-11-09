@@ -40,3 +40,27 @@ async def test_omitted_secrets_are_kept_empty_ones_cleared(alice: AsyncClient, a
 
 async def test_only_superadmin_manages_credentials(bob: AsyncClient) -> None:
     assert (await bob.get("/credential-profiles")).status_code == 403
+
+
+async def test_device_hints_name_missing_credentials(alice: AsyncClient) -> None:
+    site = (await alice.post("/sites", json={"name": "HQ"})).json()["id"]
+    profile = (
+        await alice.post(
+            "/credential-profiles",
+            json={"name": "nur SNMP", "snmp_community": "geheim"},
+        )
+    ).json()["id"]
+
+    async def add(name: str, model: str, profile_id: int | None) -> int:
+        body = {"name": name, "hostname": name, "model": model, "site_id": site}
+        if profile_id:
+            body["credential_profile_id"] = profile_id
+        return int((await alice.post("/devices", json=body)).json()["id"])
+
+    bare = await add("sw-a", "dell_n1500", None)
+    dell = await add("sw-b", "dell_n1500", profile)
+    hp = await add("sw-c", "aruba_os_switch", profile)
+    hints = {
+        (h["device_id"], h["code"]) for h in (await alice.get(f"/sites/{site}/device-hints")).json()
+    }
+    assert hints == {(bare, "no_profile"), (dell, "no_ssh_login"), (hp, "no_api_login")}

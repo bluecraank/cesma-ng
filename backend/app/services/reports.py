@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import ensure_utc, utcnow
 from app.domain.switch import PoeStatus, PortKind
-from app.models import Backup, BackupStatus, Device, Port, PortCounterSample, SiteRole
-from app.services.access import require_site_role
+from app.models import Backup, BackupStatus, Device, Port, PortCounterSample
+from app.services.access import require_site_access
 from app.services.context import Caller
 from app.services.port_stats import rates
 from app.services.uplinks import uplink_port_ids
@@ -20,7 +20,7 @@ BACKUP_STALE_AFTER = timedelta(days=2)
 
 
 async def site_report(db: AsyncSession, caller: Caller, site_id: int) -> dict[str, Any]:
-    require_site_role(caller.user, site_id, SiteRole.VIEWER)
+    require_site_access(caller.user, site_id)
     devices = (
         (await db.execute(select(Device).where(Device.site_id == site_id).order_by(Device.name)))
         .scalars()

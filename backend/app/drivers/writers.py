@@ -20,6 +20,7 @@ from app.domain.changes import (
     DeleteVlan,
     Operation,
     RenameVlan,
+    SetHostname,
     SetPortDescription,
     SetPortEnabled,
     SetPortVlans,
@@ -185,6 +186,8 @@ class DnosCliWriter(CliWriter):
                 return [f"vlan {vid}", f"name {_quote(name)}", "exit"]
             case DeleteVlan(vid):
                 return [f"no vlan {vid}"]
+            case SetHostname(name):
+                return [f"hostname {_quote(name)}"]
         raise WriteError(f"Unsupported operation {op}")
 
 
@@ -224,6 +227,8 @@ class Os10CliWriter(CliWriter):
                 return [f"interface vlan {vid}", f"description {_quote(name)}", "exit"]
             case DeleteVlan(vid):
                 return [f"no interface vlan {vid}"]
+            case SetHostname(name):
+                return [f"hostname {name}"]
         raise WriteError(f"Unsupported operation {op}")
 
 
@@ -363,6 +368,8 @@ class ArubaOsRestWriter(RestWriter):
                     result.append(RestCall("PUT", f"/vlans/{vid}", {"name": name}))
                 case DeleteVlan(vid):
                     result.append(RestCall("DELETE", f"/vlans/{vid}"))
+                case SetHostname(name):
+                    result.append(RestCall("PUT", "/system", {"name": name}))
         return result
 
     async def _session(self) -> "_ArubaOsSession":
@@ -539,6 +546,8 @@ class ArubaCxRestWriter(RestWriter):
                     result.append(RestCall("PATCH", f"/system/vlans/{vid}", {"name": name}))
                 case DeleteVlan(vid):
                     result.append(RestCall("DELETE", f"/system/vlans/{vid}"))
+                case SetHostname(name):
+                    result.append(RestCall("PATCH", "/system", {"hostname": name}))
         return result
 
     async def _session(self) -> tuple[Http, str]:

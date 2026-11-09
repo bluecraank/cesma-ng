@@ -9,9 +9,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
-from app.models import CredentialProfile, Device, DeviceStatus, Site, SiteRole
+from app.models import CredentialProfile, Device, DeviceStatus, Permission, Site
 from app.services import audit
-from app.services.access import require_site_role, visible_site_ids
+from app.services.access import require_permission, require_site_access, visible_site_ids
 from app.services.context import Caller
 from app.services.discovery import remember_ignored
 from app.services.org import room_site_id
@@ -48,6 +48,8 @@ async def list_devices(
             or_(
                 Device.name.ilike(pattern),
                 Device.hostname.ilike(pattern),
+                Device.ip_address.ilike(pattern),
+                Device.dns_name.ilike(pattern),
                 Device.model_name.ilike(pattern),
                 Device.serial_number.ilike(pattern),
             )
@@ -56,17 +58,20 @@ async def list_devices(
 
 
 async def get_device(
-    db: AsyncSession, caller: Caller, device_id: int, required: SiteRole = SiteRole.VIEWER
+    db: AsyncSession, caller: Caller, device_id: int, permission: Permission | None = None
 ) -> Device:
     device = await db.get(Device, device_id)
     if device is None:
         raise NotFoundError("Device not found")
-    require_site_role(caller.user, device.site_id, required)
+    if permission is None:
+        require_site_access(caller.user, device.site_id)
+    else:
+        require_permission(caller.user, device.site_id, permission)
     return device
 
 
 async def create_device(db: AsyncSession, caller: Caller, values: dict[str, Any]) -> Device:
-    require_site_role(caller.user, values["site_id"], SiteRole.ADMIN)
+    require_permission(caller.user, values["site_id"], Permission.DEVICES_MANAGE)
     device = Device(status=DeviceStatus.UNKNOWN, location_note="")
     _apply(device, values)
     await _validate_references(db, device)
@@ -87,11 +92,13 @@ async def create_device(db: AsyncSession, caller: Caller, values: dict[str, Any]
 async def update_device(
     db: AsyncSession, caller: Caller, device_id: int, values: dict[str, Any]
 ) -> Device:
-    device = await get_device(db, caller, device_id, SiteRole.ADMIN)
+    device = await get_device(db, caller, device_id, Permission.DEVICES_MANAGE)
     if "site_id" in values:
-        require_site_role(caller.user, values["site_id"], SiteRole.ADMIN)
+        require_permission(caller.user, values["site_id"], Permission.DEVICES_MANAGE)
     before = _snapshot(device)
     _apply(device, values)
+    if "hostname" in values and values["hostname"] != before.get("hostname"):
+        device.address_checked_at = None  # resolve IP and DNS name again on the next poll
     if device.status is DeviceStatus.UNCONFIRMED and values:
         device.status = DeviceStatus.UNKNOWN  # an admin has reviewed the discovered device
     await _validate_references(db, device)
@@ -112,7 +119,7 @@ async def update_device(
 
 
 async def delete_device(db: AsyncSession, caller: Caller, device_id: int) -> None:
-    device = await get_device(db, caller, device_id, SiteRole.ADMIN)
+    device = await get_device(db, caller, device_id, Permission.DEVICES_MANAGE)
     if device.status is DeviceStatus.UNCONFIRMED:
         await remember_ignored(db, device.hostname)
     await db.delete(device)

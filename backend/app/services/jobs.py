@@ -18,12 +18,11 @@ from app.models import (
     DeviceStatus,
     Job,
     JobStatus,
-    SiteRole,
-    SshPublicKey,
+    Permission,
     User,
 )
-from app.services import audit, backups, discovery, polling, site_config
-from app.services.access import require_site_role, visible_site_ids
+from app.services import audit, backups, discovery, polling, site_config, ssh_keys
+from app.services.access import require_permission, require_site_access, visible_site_ids
 from app.services.context import Caller, Runtime
 from app.services.device_access import device_writer
 
@@ -32,7 +31,14 @@ log = logging.getLogger(__name__)
 APPLY_TIMEOUT = 300
 MIN_SSH_KEYS = 2
 
-JOB_KINDS = ("vlan_sync", "backup", "ssh_keys", "discover", "restore")
+#: job kind -> permission needed on the job's site
+JOB_KINDS: dict[str, Permission] = {
+    "vlan_sync": Permission.VLANS_MANAGE,
+    "backup": Permission.BACKUPS_RUN,
+    "ssh_keys": Permission.SSH_KEYS_PUSH,
+    "discover": Permission.DEVICES_MANAGE,
+    "restore": Permission.BACKUPS_RESTORE,
+}
 
 
 # --- Queue -----------------------------------------------------------------------------------
@@ -43,9 +49,9 @@ async def enqueue(
 ) -> Job:
     if kind not in JOB_KINDS:
         raise ValidationFailedError(f"Unknown job kind {kind}")
-    require_site_role(caller.user, site_id, SiteRole.ADMIN)
+    require_permission(caller.user, site_id, JOB_KINDS[kind])
     if kind == "ssh_keys":
-        count = len((await db.execute(select(SshPublicKey.id))).scalars().all())
+        count = len(await ssh_keys.keys_for_site(db, site_id))
         if count < MIN_SSH_KEYS:
             raise ValidationFailedError(
                 f"At least {MIN_SSH_KEYS} SSH keys are required, so a single wrong key cannot "
@@ -81,7 +87,7 @@ async def get_job(db: AsyncSession, caller: Caller, job_id: int) -> Job:
     if job is None:
         raise NotFoundError("Job not found")
     if job.site_id is not None:
-        require_site_role(caller.user, job.site_id, SiteRole.VIEWER)
+        require_site_access(caller.user, job.site_id)
     return job
 
 
@@ -129,7 +135,8 @@ async def run_job(db: AsyncSession, job: Job, runtime: Runtime) -> None:
             raise ForbiddenError("The user who started the job no longer exists or is disabled")
         caller = Caller(user)
         if job.site_id is not None:
-            require_site_role(user, job.site_id, SiteRole.ADMIN)  # permissions may have changed
+            # permissions may have changed since the job was queued
+            require_permission(user, job.site_id, JOB_KINDS[job.kind])
         ctx = JobContext(db, job, caller, runtime)
         await RUNNERS[job.kind](ctx)
         job.status = JobStatus.DONE
@@ -208,7 +215,9 @@ async def _run_backup(ctx: JobContext) -> None:
 
 
 async def _run_ssh_keys(ctx: JobContext) -> None:
-    keys = [k.key for k in (await ctx.db.execute(select(SshPublicKey))).scalars()]
+    assert ctx.job.site_id is not None
+    keys = [k.key for k in await ssh_keys.keys_for_site(ctx.db, ctx.job.site_id)]
+    await ctx.say(f"{len(keys)} key(s) of users with SSH access to this site")
     if len(keys) < MIN_SSH_KEYS:
         raise WriteError(f"At least {MIN_SSH_KEYS} SSH keys are required")
     devices = await _devices(ctx)

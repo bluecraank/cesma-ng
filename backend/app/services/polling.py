@@ -26,7 +26,7 @@ from app.models import (
     DeviceStatus,
     PollTask,
 )
-from app.services import audit, events, inventory
+from app.services import addresses, audit, events, inventory
 from app.services.audit import Actor
 from app.services.credentials import to_device_credentials
 from app.services.events import Kind, Severity
@@ -130,6 +130,10 @@ async def poll_device(
     device = await db.get(Device, device_id)
     if device is None:
         return False
+    if task is PollTask.INVENTORY:
+        # IP and DNS name, also for unreachable devices (helps finding out why)
+        await addresses.refresh(device)
+        await db.commit()
     state = await get_state(db, device_id, task)
     credentials = to_device_credentials(await _profile(db, device), box)
     driver = driver_factory(device, credentials)

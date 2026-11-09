@@ -41,3 +41,45 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  # The production database is PostgreSQL; the tests above use SQLite.
+  migrations:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: cesma
+          POSTGRES_PASSWORD: cesma
+          POSTGRES_DB: cesma
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cesma" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      CESMA_DATABASE_URL: postgresql+asyncpg://cesma:cesma@localhost:5432/cesma
+      CESMA_SECRET_KEY: ci-secret
+      PGPASSWORD: cesma
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e .
+      - name: Upgrade to 0.3.0 schema and add a site administrator
+        run: |
+          alembic upgrade 294975d0c506
+          psql -h localhost -U cesma -d cesma -v ON_ERROR_STOP=1 -c "
+            INSERT INTO sites (id, name, created_at, updated_at) VALUES (1, 'HQ', now(), now());
+            INSERT INTO users (id, username, display_name, is_superadmin, is_active, locale, created_at, updated_at)
+              VALUES (1, 'bob', 'Bob', false, true, 'de', now(), now());
+            INSERT INTO user_site_roles (user_id, site_id, role) VALUES (1, 1, 'admin');"
+      - name: Upgrade to head keeps the role
+        run: |
+          alembic upgrade head
+          test "$(psql -h localhost -U cesma -d cesma -tAc "SELECT r.builtin FROM user_site_roles u JOIN roles r ON r.id = u.role_id")" = admin
+          psql -h localhost -U cesma -d cesma -v ON_ERROR_STOP=1 -c "INSERT INTO roles (name, description, permissions, created_at, updated_at) VALUES ('x', '', '[]', now(), now())"
+      - name: Downgrade and upgrade again
+        run: alembic downgrade base && alembic upgrade head

@@ -9,8 +9,10 @@ import {
 } from '@heroicons/vue/20/solid'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { api, type ChangePlan, type Job, type PortProfile, type SiteVlan, type SiteVlanIn } from '@/api/client'
 import UiDialog from '@/components/ui/UiDialog.vue'
+import VlanPicker from '@/components/VlanPicker.vue'
 import UiSpinner from '@/components/ui/UiSpinner.vue'
 import UiToggle from '@/components/ui/UiToggle.vue'
 import { useConfirmDelete } from '@/composables/useConfirm'
@@ -25,10 +27,11 @@ const confirmDelete = useConfirmDelete()
 const auth = useAuthStore()
 const sites = useSitesStore()
 
-const tab = ref<'vlans' | 'profiles'>('vlans')
+// ?tab=profiles opens the port profiles directly (linked from the port dialog)
+const tab = ref<'vlans' | 'profiles'>(useRoute().query.tab === 'profiles' ? 'profiles' : 'vlans')
 const vlans = ref<SiteVlan[]>([])
 const profiles = ref<PortProfile[]>([])
-const canAdmin = computed(() => auth.canAdmin(sites.currentId))
+const canAdmin = computed(() => auth.can('vlans.manage', sites.currentId))
 const base = computed(() => `/sites/${sites.currentId}`)
 
 async function load(): Promise<void> {
@@ -117,14 +120,15 @@ async function startSync(): Promise<void> {
 }
 
 // --- Port profiles ---
+const vlanName = (vid: number): string => vlans.value.find((v) => v.vid === vid)?.name ?? ''
 const profileOpen = ref(false)
 const profileId = ref<number | null>(null)
-const profileForm = ref({ name: '', untagged_vid: null as number | null, tagged: '', description: '' })
+const profileForm = ref({ name: '', untagged_vid: null as number | null, tagged: [] as number[], description: '' })
 function editProfile(p: PortProfile | null): void {
   profileId.value = p?.id ?? null
   profileForm.value = p
-    ? { name: p.name, untagged_vid: p.untagged_vid, tagged: p.tagged_vids.join(', '), description: p.description ?? '' }
-    : { name: '', untagged_vid: null, tagged: '', description: '' }
+    ? { name: p.name, untagged_vid: p.untagged_vid, tagged: [...p.tagged_vids], description: p.description ?? '' }
+    : { name: '', untagged_vid: null, tagged: [], description: '' }
   profileOpen.value = true
 }
 async function saveProfile(): Promise<void> {
@@ -132,7 +136,7 @@ async function saveProfile(): Promise<void> {
   const body = {
     name: f.name,
     untagged_vid: f.untagged_vid,
-    tagged_vids: f.tagged.split(/[\s,;]+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n > 0 && n < 4095),
+    tagged_vids: f.tagged.filter((v) => v !== f.untagged_vid),
     description: f.description || null,
   }
   const ok = await notify.run(
@@ -240,8 +244,12 @@ async function removeProfile(p: PortProfile): Promise<void> {
         <tbody>
           <tr v-for="p in profiles" :key="p.id">
             <td class="font-medium text-gray-900 dark:text-white">{{ p.name }}</td>
-            <td class="font-mono">{{ p.untagged_vid ?? '–' }}</td>
-            <td class="font-mono text-xs">{{ p.tagged_vids.join(', ') }}</td>
+            <td class="whitespace-nowrap"><span class="font-mono">{{ p.untagged_vid ?? '–' }}</span> <span class="text-xs text-gray-500">{{ p.untagged_vid ? vlanName(p.untagged_vid) : '' }}</span></td>
+            <td class="text-xs">
+              <span v-for="vid in p.tagged_vids" :key="vid" class="mr-2 inline-block whitespace-nowrap">
+                <span class="font-mono font-medium">{{ vid }}</span> <span class="text-gray-500">{{ vlanName(vid) }}</span>
+              </span>
+            </td>
             <td>{{ p.description ?? '' }}</td>
             <td v-if="canAdmin" class="whitespace-nowrap">
               <button type="button" class="btn-icon" :title="t('common.edit')" @click="editProfile(p)"><PencilSquareIcon class="size-4" /></button>
@@ -326,7 +334,7 @@ async function removeProfile(p: PortProfile): Promise<void> {
         </div>
         <div class="field">
           <label class="label" for="pp-tagged">{{ t('siteVlans.tagged') }}</label>
-          <input id="pp-tagged" v-model="profileForm.tagged" class="input font-mono" />
+          <VlanPicker v-model="profileForm.tagged" input-id="pp-tagged" :vlans="vlans" :exclude="profileForm.untagged_vid" />
           <p class="hint">{{ t('siteVlans.taggedHint') }}</p>
         </div>
         <div class="field">

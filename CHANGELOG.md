@@ -8,6 +8,30 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-09
+
+### Hinzugefügt
+
+- Rollen und Rechte: frei definierbare Rollen mit einzelnen Rechten (Geräte verwalten, Ports ändern, VLANs verwalten, Backups starten/herunterladen/wiederherstellen, Konsole, SSH-Schlüssel übertragen, SSH-Zugang); Übersicht als Matrix unter *Systemeinstellungen → Rollen*
+- Notfall-Passwort pro Benutzer: Anmeldung, wenn LDAP nicht erreichbar ist; auch per `cesma set-password <benutzer>` (legt den Benutzer bei Bedarf an)
+- Fehlermeldung beim Login nennt die Ursache, wenn LDAP nicht geht (Dienstkonto abgelehnt, Zertifikat nicht vertraut, Server nicht erreichbar, Suchbasis falsch)
+- SSH-Schlüssel gehören Benutzern: jeder verwaltet seine eigenen; auf die Switches kommen die Schlüssel der Benutzer mit dem Recht „SSH-Zugang“ am Standort
+- SSH-Schlüssel per Knopf auf einen einzelnen Switch übertragen (Geräteseite)
+- Switch umbenennen: setzt den Hostnamen auf dem Switch und den Namen in cesma-ng, mit Vorschau der Befehle
+- Geräteliste: Symbol pro Switch (Hersteller, Status), IP-Adresse und DNS-Name
+- Hinweise bei Geräten mit fehlenden Zugangsdaten (kein Zugangsprofil, kein SSH- oder API-Login, keine SNMP-Community) oder die nicht erreichbar sind, mit der Fehlermeldung und was zu tun ist
+- Ports: Bereich mit Shift+Klick auswählen, Auswahl-Leiste mit allen gewählten Ports
+- VLANs am Port: pro VLAN „Aus / Untagged / Tagged“ wählen, Suche, Markierung geänderter Zeilen; bei mehreren Ports bleiben unterschiedliche Einstellungen („gemischt“) unangetastet
+- Port-Profile: Tagged-VLANs mit Vorschlägen beim Tippen und Anzeige der VLAN-Namen; Bereiche wie 100-105
+- Klick auf den Ort eines Clients (und Treffer der globalen Suche) springt direkt zum Port und hebt ihn hervor
+- Link „Port-Profile verwalten“ im Port-Dialog
+
+### Geändert
+
+- Aufträge und SSH-Schlüssel stehen unter *Systemeinstellungen* (vorher *Verwaltung*)
+- Die bisherigen Rollen heißen „Lesen“ und „Administrator“ und sind bearbeitbar; bestehende Rechte bleiben erhalten
+- SSH-Schlüssel aus cesma-on-premise haben keinen Besitzer und kommen weiter auf alle Switches
+
 ### Behoben
 
 - Docker: eigene Ports für die Oberfläche (`CESMA_HTTP_PORT`, `CESMA_HTTPS_PORT`); die Weiterleitung von HTTP auf HTTPS nutzt jetzt den eingestellten Port statt immer 443
@@ -91,7 +115,8 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 - Audit-Log mit alten und neuen Werten
 - Deutsch/Englisch, Hell-/Dunkelmodus
 
-[Unreleased]: https://github.com/bluecraank/cesma-ng/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/bluecraank/cesma-ng/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/bluecraank/cesma-ng/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bluecraank/cesma-ng/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/bluecraank/cesma-ng/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bluecraank/cesma-ng/releases/tag/v0.1.0

@@ -53,7 +53,8 @@ async function choose(hit: SearchHit): Promise<void> {
   if (hit.site_id && hit.site_id !== sites.currentId) sites.currentId = hit.site_id
   if (hit.kind === 'client') await router.push({ name: 'clients', query: { q: hit.query ?? hit.title } })
   else if (hit.kind === 'vlan') await router.push({ name: 'device', params: { id: hit.device_id }, query: { tab: 'vlans' } })
-  else if (hit.device_id) await router.push({ name: 'device', params: { id: hit.device_id }, query: { tab: 'ports' } })
+  else if (hit.device_id)
+    await router.push({ name: 'device', params: { id: hit.device_id }, query: { tab: 'ports', ...(hit.port_id ? { port: hit.port_id } : {}) } })
 }
 
 function onKey(event: KeyboardEvent): void {

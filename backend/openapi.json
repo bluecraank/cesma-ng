@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Cesma NG",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -1178,6 +1178,53 @@
         }
       }
     },
+    "/api/v1/sites/{site_id}/device-hints": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Device Hints",
+        "description": "Setup problems per device: missing credentials, unreachable switches.",
+        "operationId": "device_hints_api_v1_sites__site_id__device_hints_get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceHintOut"
+                  },
+                  "title": "Response Device Hints Api V1 Sites  Site Id  Device Hints Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sites/{site_id}/topology": {
       "get": {
         "tags": [
@@ -1413,6 +1460,110 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PortChangeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{device_id}/rename/plan": {
+      "post": {
+        "tags": [
+          "configuration"
+        ],
+        "summary": "Plan Rename",
+        "operationId": "plan_rename_api_v1_devices__device_id__rename_plan_post",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangePlanOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{device_id}/rename/apply": {
+      "post": {
+        "tags": [
+          "configuration"
+        ],
+        "summary": "Apply Rename",
+        "operationId": "apply_rename_api_v1_devices__device_id__rename_apply_post",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameIn"
               }
             }
           }
@@ -2254,18 +2405,41 @@
           "configuration"
         ],
         "summary": "List Keys",
+        "description": "The caller's own keys; ``all_users`` (super administrators) lists everyone's.",
         "operationId": "list_keys_api_v1_ssh_keys_get",
+        "parameters": [
+          {
+            "name": "all_users",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "All Users"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/SshKeyOut"
                   },
-                  "type": "array",
                   "title": "Response List Keys Api V1 Ssh Keys Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2279,14 +2453,14 @@
         "summary": "Add Key",
         "operationId": "add_key_api_v1_ssh_keys_post",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SshKeyIn"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -3130,6 +3304,155 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/roles": {
+      "get": {
+        "tags": [
+          "administration"
+        ],
+        "summary": "List Roles",
+        "operationId": "list_roles_api_v1_roles_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RoleOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Roles Api V1 Roles Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "administration"
+        ],
+        "summary": "Create Role",
+        "operationId": "create_role_api_v1_roles_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/roles/{role_id}": {
+      "put": {
+        "tags": [
+          "administration"
+        ],
+        "summary": "Update Role",
+        "operationId": "update_role_api_v1_roles__role_id__put",
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Role Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "administration"
+        ],
+        "summary": "Delete Role",
+        "operationId": "delete_role_api_v1_roles__role_id__delete",
+        "parameters": [
+          {
+            "name": "role_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Role Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -4263,6 +4586,34 @@
         ],
         "title": "DetectResult"
       },
+      "DeviceHintOut": {
+        "properties": {
+          "device_id": {
+            "type": "integer",
+            "title": "Device Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "code",
+          "level",
+          "detail"
+        ],
+        "title": "DeviceHintOut"
+      },
       "DeviceIn": {
         "properties": {
           "name": {
@@ -4460,6 +4811,32 @@
               }
             ],
             "title": "Last Seen At"
+          },
+          "ip_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Address"
+          },
+          "dns_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dns Name"
+          },
+          "supports_ssh_keys": {
+            "type": "boolean",
+            "title": "Supports Ssh Keys"
           }
         },
         "type": "object",
@@ -4479,7 +4856,10 @@
           "firmware",
           "mac_address",
           "uptime_seconds",
-          "last_seen_at"
+          "last_seen_at",
+          "ip_address",
+          "dns_name",
+          "supports_ssh_keys"
         ],
         "title": "DeviceOut"
       },
@@ -5314,6 +5694,22 @@
         ],
         "title": "Page[ClientOut]"
       },
+      "Permission": {
+        "type": "string",
+        "enum": [
+          "devices.manage",
+          "ports.edit",
+          "vlans.manage",
+          "backups.run",
+          "backups.read",
+          "backups.restore",
+          "console",
+          "ssh_keys.push",
+          "ssh.login"
+        ],
+        "title": "Permission",
+        "description": "What a role allows on a site, beyond seeing it (every role may see and poll)."
+      },
       "PoeStatus": {
         "type": "string",
         "enum": [
@@ -5473,6 +5869,26 @@
             "type": "boolean",
             "title": "Clear Untagged",
             "default": false
+          },
+          "add_tagged": {
+            "items": {
+              "type": "integer",
+              "maximum": 4094.0,
+              "minimum": 1.0
+            },
+            "type": "array",
+            "title": "Add Tagged",
+            "default": []
+          },
+          "remove_tagged": {
+            "items": {
+              "type": "integer",
+              "maximum": 4094.0,
+              "minimum": 1.0
+            },
+            "type": "array",
+            "title": "Remove Tagged",
+            "default": []
           },
           "profile_id": {
             "anyOf": [
@@ -5820,6 +6236,93 @@
         ],
         "title": "PortStatsOut"
       },
+      "RenameIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 63,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "RenameIn"
+      },
+      "RoleIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Description",
+            "default": ""
+          },
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/Permission"
+            },
+            "type": "array",
+            "title": "Permissions",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "RoleIn"
+      },
+      "RoleOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Permissions"
+          },
+          "builtin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Builtin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "permissions",
+          "builtin"
+        ],
+        "title": "RoleOut"
+      },
       "RoomOut": {
         "properties": {
           "id": {
@@ -5952,28 +6455,34 @@
         ],
         "title": "SiteOut"
       },
-      "SiteRole": {
-        "type": "string",
-        "enum": [
-          "viewer",
-          "admin"
-        ],
-        "title": "SiteRole"
-      },
       "SiteRoleOut": {
         "properties": {
           "site_id": {
             "type": "integer",
             "title": "Site Id"
           },
-          "role": {
-            "$ref": "#/components/schemas/SiteRole"
+          "role_id": {
+            "type": "integer",
+            "title": "Role Id"
+          },
+          "role_name": {
+            "type": "string",
+            "title": "Role Name"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Permissions"
           }
         },
         "type": "object",
         "required": [
           "site_id",
-          "role"
+          "role_id",
+          "role_name",
+          "permissions"
         ],
         "title": "SiteRoleOut"
       },
@@ -6146,6 +6655,28 @@
             "type": "integer",
             "title": "Id"
           },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner"
+          },
           "description": {
             "type": "string",
             "title": "Description"
@@ -6167,6 +6698,8 @@
         "type": "object",
         "required": [
           "id",
+          "user_id",
+          "owner",
           "description",
           "key",
           "fingerprint",
@@ -6342,6 +6875,10 @@
             ],
             "title": "Last Login At"
           },
+          "has_local_password": {
+            "type": "boolean",
+            "title": "Has Local Password"
+          },
           "site_roles": {
             "items": {
               "$ref": "#/components/schemas/SiteRoleOut"
@@ -6360,6 +6897,7 @@
           "is_active",
           "locale",
           "last_login_at",
+          "has_local_password",
           "site_roles"
         ],
         "title": "UserOut"
@@ -6392,7 +6930,7 @@
             "anyOf": [
               {
                 "additionalProperties": {
-                  "$ref": "#/components/schemas/SiteRole"
+                  "type": "integer"
                 },
                 "type": "object"
               },
@@ -6401,6 +6939,18 @@
               }
             ],
             "title": "Site Roles"
+          },
+          "local_password": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Local Password"
           }
         },
         "type": "object",

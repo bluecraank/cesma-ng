@@ -2,12 +2,15 @@
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import ForeignKey, Index, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base, JsonType, TimestampMixin, str_enum, utcnow
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class SiteVlan(TimestampMixin, Base):
@@ -92,11 +95,23 @@ class Job(Base):
 
 
 class SshPublicKey(TimestampMixin, Base):
-    """Public keys that are uploaded to the switches (management user)."""
+    """A user's public key; uploaded to the switches of sites where the user has SSH access.
+
+    Keys without owner (e.g. imported from cesma-on-premise) go to every switch.
+    """
 
     __tablename__ = "ssh_public_keys"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
     description: Mapped[str] = mapped_column(String(100))
     key: Mapped[str] = mapped_column(Text)
     fingerprint: Mapped[str] = mapped_column(String(100), unique=True)
+
+    user: Mapped["User | None"] = relationship()
+
+    @property
+    def owner(self) -> str | None:
+        return self.user.username if self.user else None

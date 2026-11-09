@@ -5,15 +5,15 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Device, LldpNeighbor, Port, SiteRole
-from app.services.access import require_site_role
+from app.models import Device, LldpNeighbor, Port
+from app.services.access import require_site_access
 from app.services.context import Caller
 
 
 async def site_topology(
     db: AsyncSession, caller: Caller, site_id: int, *, include_external: bool = False
 ) -> dict[str, list[dict[str, Any]]]:
-    require_site_role(caller.user, site_id, SiteRole.VIEWER)
+    require_site_access(caller.user, site_id)
     devices = {
         d.id: d
         for d in (await db.execute(select(Device).where(Device.site_id == site_id))).scalars()

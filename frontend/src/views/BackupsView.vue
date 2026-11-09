@@ -15,7 +15,7 @@ const notify = useNotify()
 const auth = useAuthStore()
 const sites = useSitesStore()
 const backups = ref<Backup[]>([])
-const canAdmin = computed(() => auth.canAdmin(sites.currentId))
+const canRun = computed(() => auth.can('backups.run', sites.currentId))
 const { job, watch: watchJob } = useJobWatcher(() => load())
 
 async function load(): Promise<void> {
@@ -39,12 +39,12 @@ watch(() => sites.currentId, load, { immediate: true })
   <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-4">
       <h1 class="page-title">{{ t('backups.title') }}</h1>
-      <button v-if="canAdmin" type="button" class="btn btn-primary" :disabled="job?.status === 'running' || job?.status === 'pending'" @click="backupNow">
+      <button v-if="canRun" type="button" class="btn btn-primary" :disabled="job?.status === 'running' || job?.status === 'pending'" @click="backupNow">
         <UiSpinner v-if="job?.status === 'running' || job?.status === 'pending'" />
         <CloudArrowUpIcon v-else class="size-4" />
         {{ t('backups.now') }}
       </button>
     </div>
-    <BackupList :backups="backups" show-device :can-download="(b) => auth.canAdmin(b.site_id)" />
+    <BackupList :backups="backups" show-device />
   </div>
 </template>

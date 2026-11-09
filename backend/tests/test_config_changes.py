@@ -233,3 +233,27 @@ async def test_tag_uplinks_only_adds_to_trunks(alice: AsyncClient, app, settings
     assert any('"vlan_id": 777' in c and "Trk1" in c for c in tagged)
     assert not any(c.startswith("DELETE /vlans-ports") for c in plan["commands"])  # never removes
     assert any("Uplinks" in w for w in plan["warnings"])
+
+
+async def test_rename_sets_hostname_on_switch_and_in_cesma(
+    alice: AsyncClient, bob: AsyncClient, app, settings: Settings
+) -> None:  # type: ignore[no-untyped-def]
+    settings = await _simulated_app(app, settings)
+    device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
+    bad = await alice.post(f"/devices/{device_id}/rename/plan", json={"name": "mit leerzeichen"})
+    assert bad.status_code == 422
+
+    plan = (await alice.post(f"/devices/{device_id}/rename/plan", json={"name": "sw-og-07"})).json()
+    assert plan["commands"] == ['PUT /system {"name": "sw-og-07"}']
+    site_id = (await alice.get(f"/devices/{device_id}")).json()["site_id"]
+    await grant(alice, "bob", {site_id: "viewer"})
+    assert (
+        await bob.post(f"/devices/{device_id}/rename/apply", json={"name": "sw-og-07"})
+    ).status_code == 403
+
+    result = (
+        await alice.post(f"/devices/{device_id}/rename/apply", json={"name": "sw-og-07"})
+    ).json()
+    assert result["log"][0].startswith("[simulated]")
+    device = (await alice.get(f"/devices/{device_id}")).json()
+    assert (device["name"], device["sys_name"]) == ("sw-og-07", "sw-og-07")

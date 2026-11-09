@@ -25,7 +25,7 @@ from app.models.inventory import (
 )
 from app.models.notification import Notification, NotificationKind, NotificationSeverity
 from app.models.org import Building, Room, Site
-from app.models.user import SiteRole, User, UserSession, UserSiteRole
+from app.models.user import BuiltinRole, Permission, Role, User, UserSession, UserSiteRole
 
 __all__ = [
     "ArpEntry",
@@ -34,6 +34,7 @@ __all__ = [
     "Backup",
     "BackupStatus",
     "Building",
+    "BuiltinRole",
     "Client",
     "CredentialProfile",
     "Device",
@@ -51,14 +52,15 @@ __all__ = [
     "Notification",
     "NotificationKind",
     "NotificationSeverity",
+    "Permission",
     "PollTask",
     "Port",
     "PortCounterSample",
     "PortProfile",
     "PortVlan",
+    "Role",
     "Room",
     "Site",
-    "SiteRole",
     "SiteVlan",
     "SnmpGateway",
     "SnmpVersion",

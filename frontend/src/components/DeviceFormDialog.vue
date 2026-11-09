@@ -19,7 +19,7 @@ const auth = useAuthStore()
 const sites = useSitesStore()
 
 const MODELS: DeviceModel[] = ['dell_n1500', 'dell_os10', 'aruba_os_switch', 'aruba_cx']
-const siteOptions = computed(() => sites.sites.filter((s) => auth.canAdmin(s.id)))
+const siteOptions = computed(() => sites.sites.filter((s) => auth.can('devices.manage', s.id)))
 const roomOptions = computed(() => sites.rooms(form.value.site_id))
 
 const profiles = ref<CredentialProfile[]>([])

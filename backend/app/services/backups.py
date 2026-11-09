@@ -17,7 +17,7 @@ from app.core.config import Settings
 from app.core.db import utcnow
 from app.core.errors import NotFoundError
 from app.drivers.writers import WriteError
-from app.models import AuditLevel, Backup, BackupStatus, Device, DeviceStatus, SiteRole
+from app.models import AuditLevel, Backup, BackupStatus, Device, DeviceStatus, Permission
 from app.services import audit, events
 from app.services.access import visible_site_ids
 from app.services.audit import Actor
@@ -169,7 +169,7 @@ async def backup_config(
     backup = await db.get(Backup, backup_id)
     if backup is None or backup.config_encrypted is None:
         raise NotFoundError("Backup not found")
-    device = await get_device(db, caller, backup.device_id, SiteRole.ADMIN)
+    device = await get_device(db, caller, backup.device_id, Permission.BACKUPS_READ)
     return backup, device, runtime.box.decrypt(backup.config_encrypted)
 
 

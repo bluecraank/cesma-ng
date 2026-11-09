@@ -7,9 +7,11 @@ import { api, type Backup, type Job } from '@/api/client'
 import { useJobWatcher } from '@/composables/useJobWatcher'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import { useNotify } from '@/composables/useNotify'
+import { useAuthStore } from '@/stores/auth'
 import { formatDateTime } from '@/utils/format'
 
-const props = defineProps<{ backups: Backup[]; showDevice?: boolean; canDownload: (b: Backup) => boolean }>()
+const props = defineProps<{ backups: Backup[]; showDevice?: boolean }>()
+const auth = useAuthStore()
 const { t, locale } = useI18n()
 const notify = useNotify()
 
@@ -93,14 +95,14 @@ function size(bytes: number): string {
           <td class="text-right tabular-nums">{{ b.status === 'ok' ? size(b.size) : '' }}</td>
           <td class="text-xs">{{ b.created_by }}</td>
           <td class="whitespace-nowrap">
-            <template v-if="b.status === 'ok' && canDownload(b)">
+            <template v-if="b.status === 'ok' && auth.can('backups.read', b.site_id)">
               <button v-if="b.changed && previousOf(b)" type="button" class="btn-icon" :title="t('backups.diff')" @click="showDiff(b)">
                 <ArrowsRightLeftIcon class="size-4" />
               </button>
               <a :href="`/api/v1/backups/${b.id}/config`" class="btn-icon inline-flex" :title="t('backups.download')">
                 <ArrowDownTrayIcon class="size-4" />
               </a>
-              <button type="button" class="btn-icon hover:!text-orange-600" :title="t('backups.restore')" @click="askRestore(b)">
+              <button v-if="auth.can('backups.restore', b.site_id)" type="button" class="btn-icon hover:!text-orange-600" :title="t('backups.restore')" @click="askRestore(b)">
                 <ArrowUturnLeftIcon class="size-4" />
               </button>
             </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { BoltIcon, ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PencilSquareIcon } from '@heroicons/vue/20/solid'
-import { computed, ref } from 'vue'
+import { BoltIcon, ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PencilSquareIcon, XMarkIcon } from '@heroicons/vue/20/solid'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api, type DeviceVlan, type FdbEntry, type Port } from '@/api/client'
 import PortEditDialog from './PortEditDialog.vue'
@@ -8,7 +8,15 @@ import TrafficChart from './TrafficChart.vue'
 import type { components } from '@/api/schema'
 import { formatDateTime } from '@/utils/format'
 
-const props = defineProps<{ deviceId: number; siteId: number; ports: Port[]; vlans: DeviceVlan[]; canEdit: boolean }>()
+const props = defineProps<{
+  deviceId: number
+  siteId: number
+  ports: Port[]
+  vlans: DeviceVlan[]
+  canEdit: boolean
+  /** scroll to this port, open and highlight it */
+  focusPortId?: number | null
+}>()
 const emit = defineEmits<{ changed: [] }>()
 const { t, locale } = useI18n()
 
@@ -22,12 +30,45 @@ const selected = ref<Set<number>>(new Set())
 const editOpen = ref(false)
 const editPorts = ref<Port[]>([])
 
-function toggleSelect(id: number): void {
+// Shift-click selects the range from the last clicked port (in the visible order).
+let anchor: number | null = null
+function toggleSelect(id: number, event: MouseEvent): void {
   const next = new Set(selected.value)
-  if (next.has(id)) next.delete(id)
+  const ids = rows.value.map((p) => p.id)
+  if (event.shiftKey && anchor !== null && ids.includes(anchor)) {
+    const from = Math.min(ids.indexOf(anchor), ids.indexOf(id))
+    const to = Math.max(ids.indexOf(anchor), ids.indexOf(id))
+    // The range gets the state of the last clicked port (select or deselect).
+    const select = selected.value.has(anchor)
+    for (const rangeId of ids.slice(from, to + 1)) {
+      if (select) next.add(rangeId)
+      else next.delete(rangeId)
+    }
+  } else if (next.has(id)) next.delete(id)
   else next.add(id)
+  anchor = id
   selected.value = next
 }
+
+const selectedPorts = computed(() => props.ports.filter((p) => selected.value.has(p.id)))
+
+// Jump to a port: reset the filters, open it and scroll it into the middle of the screen.
+const highlighted = ref<number | null>(null)
+watch(
+  () => [props.focusPortId, props.ports.length] as const,
+  async ([id]) => {
+    const port = props.ports.find((p) => p.id === id)
+    if (!port || highlighted.value === port.id) return
+    search.value = ''
+    onlyUp.value = false
+    onlyUplinks.value = false
+    highlighted.value = port.id
+    void toggle(port)
+    await nextTick()
+    document.getElementById(`port-${port.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  },
+  { immediate: true },
+)
 
 function toggleAll(): void {
   selected.value = selected.value.size === rows.value.length ? new Set() : new Set(rows.value.map((p) => p.id))
@@ -90,15 +131,25 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
       </div>
       <label class="flex items-center gap-2 text-sm"><input v-model="onlyUp" type="checkbox" class="rounded accent-indigo-600" /> {{ t('ports.onlyUp') }}</label>
       <label class="flex items-center gap-2 text-sm"><input v-model="onlyUplinks" type="checkbox" class="rounded accent-indigo-600" /> {{ t('ports.onlyUplinks') }}</label>
-      <button
-        v-if="canEdit && selected.size"
-        type="button"
-        class="btn btn-primary btn-sm"
-        @click="edit(ports.filter((p) => selected.has(p.id)))"
-      >
-        <PencilSquareIcon class="size-4" /> {{ t('change.editPorts', { n: selected.size }) }}
-      </button>
       <span class="ml-auto text-sm text-gray-500 dark:text-gray-400">{{ rows.length }} / {{ ports.length }}</span>
+    </div>
+
+    <!-- Selection bar: stays visible while scrolling through long port lists -->
+    <div
+      v-if="canEdit && selected.size"
+      class="sticky top-16 z-10 flex flex-wrap items-center gap-3 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm text-white shadow-lg"
+    >
+      <span class="font-medium">{{ t('change.selected', { n: selected.size }) }}</span>
+      <span class="truncate font-mono text-xs text-indigo-100">{{ selectedPorts.map((p) => p.name).join(', ') }}</span>
+      <span class="hidden text-xs text-indigo-200 lg:inline">{{ t('change.shiftHint') }}</span>
+      <div class="ml-auto flex gap-2">
+        <button type="button" class="btn btn-sm bg-white text-indigo-700 hover:bg-indigo-50" @click="edit(selectedPorts)">
+          <PencilSquareIcon class="size-4" /> {{ t('change.editPorts', { n: selected.size }) }}
+        </button>
+        <button type="button" class="rounded-md p-1.5 text-indigo-100 hover:bg-white/10" :title="t('change.clearSelection')" @click="selected = new Set()">
+          <XMarkIcon class="size-4" />
+        </button>
+      </div>
     </div>
 
     <p v-if="!ports.length" class="card p-6 text-sm text-gray-500">{{ t('ports.noData') }}</p>
@@ -125,9 +176,17 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
         </thead>
         <tbody>
           <template v-for="p in rows" :key="p.id">
-            <tr class="cursor-pointer" :class="{ 'bg-indigo-50/50 dark:bg-indigo-500/5': selected.has(p.id) }" @click="toggle(p)">
-              <td v-if="canEdit" @click.stop>
-                <input type="checkbox" class="accent-indigo-600" :checked="selected.has(p.id)" @change="toggleSelect(p.id)" />
+            <tr
+              :id="`port-${p.id}`"
+              class="cursor-pointer scroll-mt-32"
+              :class="{
+                'bg-indigo-50/50 dark:bg-indigo-500/5': selected.has(p.id),
+                'outline-2 -outline-offset-2 outline-amber-400 bg-amber-50 dark:bg-amber-400/10': highlighted === p.id,
+              }"
+              @click="toggle(p)"
+            >
+              <td v-if="canEdit" class="select-none" @click.stop="toggleSelect(p.id, $event)">
+                <input type="checkbox" class="pointer-events-none accent-indigo-600" :checked="selected.has(p.id)" tabindex="-1" />
               </td>
               <td class="text-gray-400">
                 <ChevronDownIcon v-if="expanded === p.id" class="size-4" />

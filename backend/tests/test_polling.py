@@ -147,3 +147,13 @@ async def test_site_report(alice: AsyncClient, app, settings: Settings) -> None:
     assert free["total"] == 48 and len(free["free"]) == 42  # 52 ports - 4 uplinks; 6 up
     assert report["poe"][0]["ports"] == 48
     assert report["backups"][0]["last_backup"] is None  # never backed up
+
+
+async def test_device_address_from_ip_or_name() -> None:
+    from app.services.addresses import resolve
+
+    ip, _ = await resolve("127.0.0.1")
+    assert ip == "127.0.0.1"
+    ip, name = await resolve("localhost")
+    assert (ip, name) == ("127.0.0.1", "localhost")  # IPv4 preferred
+    assert await resolve("does-not-exist.invalid") == (None, "does-not-exist.invalid")

@@ -40,7 +40,21 @@ async def login(
     try:
         identity = await authenticator.authenticate(body.username, body.password)
     except AuthBackendError as exc:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Directory not reachable") from exc
+        # Fallback: users with an emergency password can still log in while LDAP is down.
+        user = await users.emergency_login(db, body.username, body.password)
+        if user is None:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, f"Directory not reachable: {exc}"
+            ) from exc
+        await audit.record(
+            db,
+            Actor.of(user, ip),
+            "auth.emergency_login",
+            "Login with emergency password (directory not reachable)",
+            level=AuditLevel.WARNING,
+        )
+        await _start_session(db, response, settings, sessions, user, ip, "Emergency login")
+        return user
 
     if identity is None:
         await audit.record(

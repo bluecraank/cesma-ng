@@ -26,7 +26,8 @@ Die Änderungen pro Version stehen im [CHANGELOG](CHANGELOG.md). Die Anwendung z
 - **Anmeldung:**
   - Active Directory (LDAP) mit verschachtelten Gruppen
   - optional SSO über einen Reverse-Proxy
-  - Rollen pro Standort: Lesen oder Administrator, dazu Superadmin
+  - Rollen mit einzelnen Rechten pro Standort, dazu Superadmin
+  - Notfall-Passwort, wenn LDAP nicht erreichbar ist
 - **Inventar:**
   - Standorte, Gebäude, Räume, Geräte und Zugangsprofile; die Geheimnisse sind verschlüsselt gespeichert
   - automatische Erkennung neuer Switches
@@ -37,7 +38,8 @@ Die Änderungen pro Version stehen im [CHANGELOG](CHANGELOG.md). Die Anwendung z
 - **Änderungen** (immer mit Vorschau der exakten Befehle):
   - Ports, auch mehrere auf einmal und per Port-Profil
   - VLAN-Abgleich pro Standort, optional mit Tagging auf Uplinks
-  - SSH-Schlüssel
+  - SSH-Schlüssel der Benutzer (pro Standort nach Recht „SSH-Zugang“)
+  - Switch umbenennen (Hostname auf dem Gerät)
   - Backup-Wiederherstellung
 - **Backups:** täglich, mit Vergleich, Download und Wochenbericht per Mail.
 - **Clients:** Suche nach MAC, IP, Hostname, VLAN oder Port. Dazu Hersteller (IEEE), MAC-Typen, Verlauf, DNS und SNMP-Gateways.
@@ -66,6 +68,7 @@ docker compose up -d --build
 - **`CESMA_SECRET_KEY`** verschlüsselt alle gespeicherten Geheimnisse (Switch-Zugangsdaten, Backups). Wird er geändert, sind sie nicht mehr lesbar.
 - **Erster Login:** Wer sich als Erstes anmeldet, wird Superadmin. Alle anderen bekommen ihre Rechte unter *Verwaltung → Benutzer*.
 - **Die wichtigsten Einstellungen** stehen mit Erklärung in [.env.example](.env.example): LDAP, SSO, Mail und Abfrage-Intervalle.
+- **Adresse und Ports:** `CESMA_SITE_ADDRESS` enthält alle Namen und IPs, unter denen die Oberfläche aufgerufen wird. Wer per IP aufruft, setzt zusätzlich `CESMA_DEFAULT_SNI` auf diese IP. Andere Ports als 80/443: `CESMA_HTTP_PORT` und `CESMA_HTTPS_PORT`.
 
 ### Geplante Aufgaben (Worker)
 
@@ -97,6 +100,7 @@ Bei unerreichbaren Geräten verlängert sich der Abstand der Abfragen automatisc
 ```bash
 docker compose exec api cesma users
 docker compose exec api cesma set-superadmin <benutzer> [--revoke]
+docker compose exec api cesma set-password <benutzer> [--superadmin]   # Notfall-Passwort
 ```
 
 ### Daten aus cesma-on-premise übernehmen
@@ -116,15 +120,35 @@ docker compose exec api cesma import-legacy \
   - optional die Backups
 - **Was nicht übernommen wird:** Benutzer und Rechte. Jeder meldet sich einmal an, dann vergibt ein Superadmin die Standorte.
 
-## Rollen
+## Rollen und Rechte
 
-| Rolle | Darf |
+Benutzer bekommen **pro Standort eine Rolle**. Jede Rolle darf den Standort ansehen und Abfragen anstoßen; alles Weitere legen ihre Rechte fest. Rollen werden unter *Systemeinstellungen → Rollen* angelegt.
+
+| Recht | Erlaubt |
 |---|---|
-| Lesen (pro Standort) | alles des Standorts ansehen, Abfrage anstoßen |
-| Administrator (pro Standort) | zusätzlich Geräte, Räume, Ports, VLANs ändern, Backups herunterladen/wiederherstellen, Konsole |
-| Superadmin | alles: Standorte, Benutzer, Zugangsprofile, SSH-Schlüssel, MAC-Typen, Gateways |
+| Geräte verwalten | Geräte anlegen, ändern, umbenennen, löschen; Gebäude, Räume; Switch-Suche |
+| Ports ändern | Beschreibung, aktiv/deaktiviert, VLANs von Ports |
+| VLANs verwalten | Soll-VLANs, Port-Profile, VLAN-Abgleich |
+| Backups starten / herunterladen / wiederherstellen | jeweils einzeln; Herunterladen zeigt Geheimnisse der Switches |
+| Konsole | lesende Befehle auf dem Switch |
+| SSH-Schlüssel übertragen | die Schlüssel auf die Switches schreiben |
+| SSH-Zugang | die eigenen SSH-Schlüssel des Benutzers kommen auf die Switches des Standorts |
 
-Die Rechte prüft das Backend in den Service-Funktionen. Hintergrund-Aufträge prüfen beim Ausführen erneut die Rechte dessen, der sie gestartet hat.
+- **Vorgegebene Rollen:** „Lesen“ (keine Rechte) und „Administrator“ (alle). Beide sind bearbeitbar, aber nicht löschbar.
+- **Superadmin:** darf alles, auch Standorte, Benutzer, Rollen, Zugangsprofile, MAC-Typen und Gateways.
+- **Prüfung:** Die Rechte prüft das Backend in den Service-Funktionen. Hintergrund-Aufträge prüfen beim Ausführen erneut die Rechte dessen, der sie gestartet hat.
+
+### Notfall-Zugang ohne LDAP
+
+Ein Superadmin kann Benutzern ein **Notfall-Passwort** geben (*Benutzer → Bearbeiten*). Es wird nur angenommen, wenn LDAP nicht erreichbar ist, und jede Anmeldung damit steht im Protokoll.
+
+Funktioniert LDAP noch gar nicht (Ersteinrichtung), auf dem Server:
+
+```bash
+docker compose exec api cesma set-password <benutzer> --superadmin
+```
+
+Das legt den Benutzer bei Bedarf an. Die Anmeldung damit klappt, solange LDAP nicht erreichbar oder falsch eingerichtet ist; die Fehlermeldung beim Login nennt dann die Ursache.
 
 ## Entwicklung
 

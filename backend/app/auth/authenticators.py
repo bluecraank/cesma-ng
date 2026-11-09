@@ -8,7 +8,12 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from ldap3 import NONE, SUBTREE, Connection, Server, Tls
-from ldap3.core.exceptions import LDAPException
+from ldap3.core.exceptions import (
+    LDAPBindError,
+    LDAPException,
+    LDAPSocketOpenError,
+    LDAPSocketReceiveError,
+)
 from ldap3.utils.conv import escape_filter_chars
 
 from app.core.config import AuthBackend, Settings
@@ -115,7 +120,7 @@ class LdapAuthenticator:
                 entries = list(service.entries)
         except LDAPException as exc:
             log.error("LDAP search failed: %s", exc)
-            raise AuthBackendError("Directory not reachable") from exc
+            raise AuthBackendError(ldap_reason(exc)) from exc
         if len(entries) != 1:
             log.info("LDAP login rejected for %r: %d matching entries", username, len(entries))
             return None
@@ -131,8 +136,22 @@ class LdapAuthenticator:
             user_conn.unbind()
         except LDAPException as exc:
             log.error("LDAP user bind failed: %s", exc)
-            raise AuthBackendError("Directory not reachable") from exc
+            raise AuthBackendError(ldap_reason(exc)) from exc
         return _identity(entry, username) if bound else None
+
+
+def ldap_reason(exc: Exception) -> str:
+    """A short, actionable reason for the login page (details stay in the log)."""
+    text = str(exc).lower()
+    if isinstance(exc, LDAPBindError) or "invalidcredentials" in text or "automatic bind" in text:
+        return "service account rejected (CESMA_LDAP_BIND_DN / CESMA_LDAP_BIND_PASSWORD)"
+    if "certificate" in text or "ssl" in text or "tls" in text:
+        return "TLS certificate of the domain controller not trusted (CESMA_LDAP_CA_FILE)"
+    if isinstance(exc, LDAPSocketOpenError | LDAPSocketReceiveError) or "socket" in text:
+        return "domain controller not reachable (CESMA_LDAP_URL)"
+    if "nosuchobject" in text:
+        return "search base not found (CESMA_LDAP_BASE_DN)"
+    return exc.__class__.__name__
 
 
 def _identity(entry: Any, username: str) -> Identity:

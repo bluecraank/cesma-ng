@@ -61,4 +61,4 @@ async def test_role_changes_are_audited(alice: AsyncClient, bob: AsyncClient) ->
     hq = await _site(alice, "HQ")
     await grant(alice, "bob", {hq: "admin"})
     entries = (await alice.get("/audit", params={"action": "user.update"})).json()["items"]
-    assert entries[0]["new_values"] == {"site_roles": {str(hq): "admin"}}
+    assert entries[0]["new_values"] == {"site_roles": {str(hq): "Administrator"}}

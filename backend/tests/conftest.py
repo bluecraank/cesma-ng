@@ -7,6 +7,7 @@ from app.auth.authenticators import StaticAuthenticator
 from app.core.config import AuthBackend, Environment, Settings
 from app.core.db import Base
 from app.main import create_app
+from app.services.users import ensure_builtin_roles
 
 USERS = {"alice": "pw-alice", "bob": "pw-bob", "carol": "pw-carol"}
 HEADERS = {"X-Requested-With": "cesma"}
@@ -28,6 +29,9 @@ async def app(settings: Settings):  # type: ignore[no-untyped-def]
     application = create_app(settings, StaticAuthenticator(USERS))
     async with application.state.database.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    async with application.state.database.sessionmaker() as session:
+        await ensure_builtin_roles(session)
+        await session.commit()
     yield application
     await application.state.database.dispose()
 
@@ -70,9 +74,14 @@ async def user_id(admin: AsyncClient, username: str) -> int:
     return next(u["id"] for u in users if u["username"] == username)
 
 
+async def role_id(admin: AsyncClient, role: str) -> int:
+    """Id of a built-in ("viewer", "admin") or custom role (by name)."""
+    roles = (await admin.get("/roles")).json()
+    return next(r["id"] for r in roles if role in (r["builtin"], r["name"]))
+
+
 async def grant(admin: AsyncClient, username: str, roles: dict[int, str]) -> None:
     uid = await user_id(admin, username)
-    r = await admin.patch(
-        f"/users/{uid}", json={"site_roles": {str(k): v for k, v in roles.items()}}
-    )
+    ids = {str(site): await role_id(admin, role) for site, role in roles.items()}
+    r = await admin.patch(f"/users/{uid}", json={"site_roles": ids})
     assert r.status_code == 200, r.text

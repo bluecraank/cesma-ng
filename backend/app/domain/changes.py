@@ -55,8 +55,21 @@ class DeleteVlan:
     vid: int
 
 
+@dataclass(frozen=True)
+class SetHostname:
+    """The switch's own name (hostname / system name), not only the name in cesma-ng."""
+
+    name: str
+
+
 Operation = (
-    SetPortDescription | SetPortEnabled | SetPortVlans | CreateVlan | RenameVlan | DeleteVlan
+    SetPortDescription
+    | SetPortEnabled
+    | SetPortVlans
+    | CreateVlan
+    | RenameVlan
+    | DeleteVlan
+    | SetHostname
 )
 
 
