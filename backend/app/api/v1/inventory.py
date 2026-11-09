@@ -9,18 +9,23 @@ from app.core.crypto import SecretBox
 from app.drivers.registry import detect
 from app.models import Permission
 from app.schemas import (
+    ComplianceOut,
+    ComplianceRuleIn,
+    ComplianceRuleOut,
     DetectRequest,
     DetectResult,
     DeviceHintOut,
     DeviceVlanOut,
     FdbEntryOut,
+    FreePortsDeviceOut,
     LldpNeighborOut,
     PollStateOut,
+    PortHistoryOut,
     PortOut,
     PortStatsOut,
     TopologyOut,
 )
-from app.services import credentials, inventory_query, polling
+from app.services import compliance, credentials, inventory_query, polling, port_history
 from app.services.access import require_permission_anywhere
 from app.services.device_hints import site_hints
 from app.services.devices import get_device
@@ -92,6 +97,62 @@ async def device_hints(
 ) -> object:
     """Setup problems per device: missing credentials, unreachable switches."""
     return await site_hints(db, caller, box, site_id)
+
+
+@router.get("/devices/{device_id}/ports/{port_id}/history", response_model=PortHistoryOut)
+async def history(device_id: int, port_id: int, db: Db, caller: CallerDep) -> object:
+    """Link and configuration events, and the devices seen on the port."""
+    return await port_history.port_history(db, caller, device_id, port_id)
+
+
+@router.get("/sites/{site_id}/free-ports", response_model=list[FreePortsDeviceOut])
+async def free_ports(
+    site_id: int,
+    db: Db,
+    caller: CallerDep,
+    building_id: int | None = None,
+    room_id: int | None = None,
+    min_days: Annotated[int, Query(ge=0, le=3650)] = 30,
+    include_disabled: bool = False,
+) -> object:
+    return await port_history.free_ports(
+        db,
+        caller,
+        site_id,
+        building_id=building_id,
+        room_id=room_id,
+        min_days=min_days,
+        include_disabled=include_disabled,
+    )
+
+
+@router.get("/sites/{site_id}/compliance", response_model=ComplianceOut)
+async def site_compliance(
+    site_id: int, db: Db, caller: CallerDep, box: Annotated[SecretBox, Depends(get_secret_box)]
+) -> object:
+    return await compliance.site_compliance(db, caller, box, site_id)
+
+
+@router.get("/compliance-rules", response_model=list[ComplianceRuleOut])
+async def list_rules(db: Db, caller: CallerDep) -> object:
+    return await compliance.list_rules(db, caller)
+
+
+@router.post(
+    "/compliance-rules", response_model=ComplianceRuleOut, status_code=status.HTTP_201_CREATED
+)
+async def create_rule(body: ComplianceRuleIn, db: Db, caller: CallerDep) -> object:
+    return await compliance.save_rule(db, caller, body.model_dump())
+
+
+@router.put("/compliance-rules/{rule_id}", response_model=ComplianceRuleOut)
+async def update_rule(rule_id: int, body: ComplianceRuleIn, db: Db, caller: CallerDep) -> object:
+    return await compliance.save_rule(db, caller, body.model_dump(), rule_id)
+
+
+@router.delete("/compliance-rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_rule(rule_id: int, db: Db, caller: CallerDep) -> None:
+    await compliance.delete_rule(db, caller, rule_id)
 
 
 @router.get("/sites/{site_id}/topology", response_model=TopologyOut)

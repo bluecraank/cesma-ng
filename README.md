@@ -48,6 +48,9 @@ Die Änderungen pro Version stehen im [CHANGELOG](CHANGELOG.md). Die Anwendung z
   - Berichte: Firmware, freie Ports, PoE, Fehler, Backups
   - Benachrichtigungen
   - Audit-Log mit alten und neuen Werten
+  - Konfigurationsregeln, geprüft gegen die Backups
+  - freie Ports pro Gebäude/Raum
+  - Port-Verlauf: Link- und Konfigurationsänderungen, angeschlossene Geräte
   - globale Suche (Strg+K)
   - Konsole für lesende Befehle
 
@@ -92,6 +95,7 @@ Aufräumen bedeutet:
 - Clients nach 8 Wochen
 - Backups nach 4 Wochen (die neuesten 5 pro Gerät bleiben immer)
 - Portstatistik nach 14 Tagen
+- Port-Verlauf nach 90 Tagen
 
 Bei unerreichbaren Geräten verlängert sich der Abstand der Abfragen automatisch (Backoff). Nach zwei fehlgeschlagenen Inventar-Abfragen gilt ein Gerät als offline und es gibt eine Benachrichtigung.
 

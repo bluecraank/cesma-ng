@@ -6,6 +6,8 @@ tables are snapshots and replaced as a whole.
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,8 +23,12 @@ from app.models import (
     LldpNeighbor,
     Port,
     PortCounterSample,
+    PortEvent,
+    PortEventKind,
+    PortMacSighting,
     PortVlan,
 )
+from app.services.uplinks import uplink_port_ids
 
 
 @dataclass
@@ -72,15 +78,28 @@ async def _apply_ports(
     for data in ports:
         seen.add(data.if_index)
         port = existing.get(data.if_index)
+        wanted = {(v, False) for v in data.untagged_vlans} | {(v, True) for v in data.tagged_vlans}
         if port is None:
             port = Port(device_id=device.id, if_index=data.if_index, vlans=[])
             db.add(port)
             changes.ports_added += 0 if first_poll else 1
-        elif port.oper_up != data.oper_up:
-            port.last_change_at = now
-            (changes.links_up if data.oper_up else changes.links_down).append(data.name)
-        elif data.oper_up and port.speed_mbps != data.speed_mbps:
-            changes.speed_changed.append((data.name, port.speed_mbps, data.speed_mbps))
+        else:
+            if port.oper_up != data.oper_up:
+                port.last_change_at = now
+                (changes.links_up if data.oper_up else changes.links_down).append(data.name)
+                kind = PortEventKind.LINK_UP if data.oper_up else PortEventKind.LINK_DOWN
+                db.add(PortEvent(port_id=port.id, at=now, kind=kind, detail={}))
+            elif data.oper_up and port.speed_mbps != data.speed_mbps:
+                changes.speed_changed.append((data.name, port.speed_mbps, data.speed_mbps))
+                db.add(
+                    PortEvent(
+                        port_id=port.id,
+                        at=now,
+                        kind=PortEventKind.SPEED,
+                        detail={"old": port.speed_mbps, "new": data.speed_mbps},
+                    )
+                )
+            _record_outside_changes(db, port, data, wanted, now)
 
         port.name = data.name
         port.kind = data.kind
@@ -91,7 +110,6 @@ async def _apply_ports(
         port.mac_address = data.mac_address
         port.pvid = data.pvid
         port.poe = data.poe
-        wanted = {(v, False) for v in data.untagged_vlans} | {(v, True) for v in data.tagged_vlans}
         if {(v.vid, v.tagged) for v in port.vlans} != wanted:
             port.vlans = [PortVlan(vid=vid, tagged=tagged) for vid, tagged in sorted(wanted)]
 
@@ -100,6 +118,35 @@ async def _apply_ports(
             await db.delete(port)
             changes.ports_removed += 1
     await db.flush()
+
+
+def _port_config(description: str, enabled: bool, vlans: set[tuple[int, bool]]) -> dict[str, Any]:
+    return {
+        "description": description,
+        "enabled": enabled,
+        "untagged": next((vid for vid, tagged in sorted(vlans) if not tagged), None),
+        "tagged": sorted(vid for vid, tagged in vlans if tagged),
+    }
+
+
+def _record_outside_changes(
+    db: AsyncSession,
+    port: Port,
+    data: dom.Port,
+    wanted: set[tuple[int, bool]],
+    now: datetime,
+) -> None:
+    """Changes made on the switch itself (cesma-ng updates the port right after its own)."""
+    before = _port_config(port.description, port.admin_up, {(v.vid, v.tagged) for v in port.vlans})
+    after = _port_config(data.description, data.admin_up, wanted)
+    old = {k: v for k, v in before.items() if after[k] != v}
+    if old:
+        new = {k: after[k] for k in old}
+        db.add(
+            PortEvent(
+                port_id=port.id, at=now, kind=PortEventKind.CHANGED, detail={"old": old, "new": new}
+            )
+        )
 
 
 async def _apply_vlans(db: AsyncSession, device: Device, vlans: Sequence[dom.Vlan]) -> None:
@@ -139,6 +186,47 @@ async def apply_fdb(db: AsyncSession, device: Device, entries: Sequence[dom.FdbE
         )
         for e in entries
     )
+    await db.flush()
+    await _record_sightings(db, device.id, ports, entries, now)
+
+
+async def _record_sightings(
+    db: AsyncSession,
+    device_id: int,
+    ports: dict[int, int],
+    entries: Sequence[dom.FdbEntry],
+    now: datetime,
+) -> None:
+    """Port history: which devices were connected to which access port (not uplinks)."""
+    access = set(ports.values()) - await uplink_port_ids(db, device_id)
+    seen: dict[tuple[int, str], int | None] = {}
+    for e in entries:
+        port_id = ports.get(e.if_index) if e.if_index is not None else None
+        if port_id in access:
+            seen[(port_id, e.mac_address)] = e.vid
+    if not seen:
+        return
+    existing = {
+        (s.port_id, s.mac_address): s
+        for s in (
+            await db.execute(
+                select(PortMacSighting).where(
+                    PortMacSighting.port_id.in_({port for port, _ in seen})
+                )
+            )
+        ).scalars()
+    }
+    for (port_id, mac), vid in seen.items():
+        sighting = existing.get((port_id, mac))
+        if sighting is None:
+            db.add(
+                PortMacSighting(
+                    port_id=port_id, mac_address=mac, vid=vid, first_seen_at=now, last_seen_at=now
+                )
+            )
+        else:
+            sighting.last_seen_at = now
+            sighting.vid = vid
     await db.flush()
 
 

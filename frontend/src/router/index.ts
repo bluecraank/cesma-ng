@@ -29,6 +29,8 @@ export const router = createRouter({
         { path: 'vlans', name: 'vlans', component: () => import('@/views/VlansView.vue') },
         { path: 'backups', name: 'backups', component: () => import('@/views/BackupsView.vue') },
         { path: 'reports', name: 'reports', component: () => import('@/views/ReportsView.vue') },
+        { path: 'free-ports', name: 'free-ports', component: () => import('@/views/FreePortsView.vue') },
+        { path: 'compliance', name: 'compliance', component: () => import('@/views/ComplianceView.vue') },
         { path: 'admin/jobs', name: 'jobs', component: () => import('@/views/JobsView.vue') },
         { path: 'jobs', redirect: '/admin/jobs' },
         { path: 'audit', name: 'audit', component: () => import('@/views/AuditView.vue') },

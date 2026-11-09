@@ -26,6 +26,7 @@ const onlyUplinks = ref(false)
 const expanded = ref<number | null>(null)
 const macs = ref<FdbEntry[]>([])
 const stats = ref<components['schemas']['PortStatsOut'] | null>(null)
+const history = ref<components['schemas']['PortHistoryOut'] | null>(null)
 const selected = ref<Set<number>>(new Set())
 const editOpen = ref(false)
 const editPorts = ref<Port[]>([])
@@ -104,10 +105,30 @@ async function toggle(port: Port): Promise<void> {
   }
   expanded.value = port.id
   stats.value = null
-  ;[macs.value, stats.value] = await Promise.all([
+  history.value = null
+  ;[macs.value, stats.value, history.value] = await Promise.all([
     port.mac_count ? api.get<FdbEntry[]>(`/devices/${props.deviceId}/fdb`, { port_id: port.id }) : Promise.resolve([]),
     api.get<components['schemas']['PortStatsOut']>(`/devices/${props.deviceId}/ports/${port.id}/stats`).catch(() => null),
+    api.get<components['schemas']['PortHistoryOut']>(`/devices/${props.deviceId}/ports/${port.id}/history`).catch(() => null),
   ])
+}
+
+/** "description: alt → neu, untagged: 10 → 20" */
+function describeChange(old: unknown, now: unknown): string {
+  const before = (old ?? {}) as Record<string, unknown>
+  const after = (now ?? {}) as Record<string, unknown>
+  const show = (v: unknown): string => (Array.isArray(v) ? v.join(', ') || '—' : v === null || v === '' ? '—' : String(v))
+  return Object.keys(after)
+    .map((key) => `${t(`history.fields.${key}`)}: ${show(before[key])} → ${show(after[key])}`)
+    .join(' · ')
+}
+
+const EVENT_STYLE: Record<string, string> = {
+  link_up: 'bg-green-500',
+  link_down: 'bg-gray-400',
+  speed: 'bg-amber-500',
+  configured: 'bg-indigo-500',
+  changed: 'bg-orange-500',
 }
 
 function speed(mbps: number | null): string {
@@ -241,6 +262,40 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
                     <td class="py-0.5 font-mono">{{ m.ip_addresses.join(', ') }}</td>
                   </tr>
                 </table>
+                <div v-if="history" class="mt-4 grid gap-6 lg:grid-cols-2">
+                  <div>
+                    <p class="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">{{ t('history.events') }}</p>
+                    <ol v-if="history.events.length" class="max-h-64 space-y-1.5 overflow-y-auto pr-2 text-xs">
+                      <li v-for="(e, i) in history.events" :key="i" class="flex gap-2">
+                        <span class="mt-1 size-2 shrink-0 rounded-full" :class="EVENT_STYLE[e.kind] ?? 'bg-gray-400'" />
+                        <span class="w-28 shrink-0 text-gray-500 tabular-nums">{{ formatDateTime(e.at, locale) }}</span>
+                        <span class="min-w-0">
+                          <span class="font-medium">{{ t(`history.kinds.${e.kind}`) }}</span>
+                          <template v-if="e.kind === 'speed'"> {{ speed(e.old as number) || '—' }} → {{ speed(e.new as number) }}</template>
+                          <template v-else-if="e.new"> – {{ describeChange(e.old, e.new) }}</template>
+                          <span v-if="e.actor" class="text-gray-500"> ({{ e.actor }})</span>
+                        </span>
+                      </li>
+                    </ol>
+                    <p v-else class="text-xs text-gray-500">{{ t('history.noEvents') }}</p>
+                  </div>
+                  <div>
+                    <p class="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">{{ t('history.devices') }}</p>
+                    <table v-if="history.devices.length" class="w-full text-xs">
+                      <tr v-for="d in history.devices" :key="d.mac_address" class="align-top">
+                        <td class="py-0.5 pr-3 font-mono">{{ d.mac_address }}</td>
+                        <td class="py-0.5 pr-3">
+                          {{ d.hostname || d.ip_address || '' }}
+                          <span v-if="d.vendor" class="block text-gray-500">{{ d.vendor }}</span>
+                        </td>
+                        <td class="py-0.5 text-right whitespace-nowrap text-gray-500 tabular-nums">
+                          {{ formatDateTime(d.first_seen_at, locale) }} – {{ formatDateTime(d.last_seen_at, locale) }}
+                        </td>
+                      </tr>
+                    </table>
+                    <p v-else class="text-xs text-gray-500">{{ t('history.noDevices') }}</p>
+                  </div>
+                </div>
               </td>
             </tr>
           </template>

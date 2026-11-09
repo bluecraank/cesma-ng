@@ -16,7 +16,16 @@ from app.domain.changes import (
     SetPortVlans,
 )
 from app.drivers.writers import WriteError
-from app.models import AuditLevel, Device, DeviceVlan, Permission, Port, PortVlan
+from app.models import (
+    AuditLevel,
+    Device,
+    DeviceVlan,
+    Permission,
+    Port,
+    PortEvent,
+    PortEventKind,
+    PortVlan,
+)
 from app.services import audit, polling
 from app.services.context import Caller, Runtime
 from app.services.device_access import device_writer
@@ -167,6 +176,17 @@ async def apply_port_change(
 
     _update_ports(result.ports, plan.operations)
     after = {p.name: _port_state(p) for p in result.ports}
+    for port in result.ports:
+        port_old, port_new = audit.changes(before[port.name], after[port.name])
+        if port_new:
+            db.add(
+                PortEvent(
+                    port_id=port.id,
+                    kind=PortEventKind.CONFIGURED,
+                    actor=caller.user.username,
+                    detail={"old": port_old, "new": port_new},
+                )
+            )
     old, new = audit.changes(before, after)
     await audit.record(
         db,

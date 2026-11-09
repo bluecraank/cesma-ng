@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     retention_client_days: int = 56
     retention_backup_days: int = 28
     retention_port_stats_days: int = 14
+    retention_port_history_days: int = 90
 
     # Backups
     backup_time: str = "22:30"  # daily, local time HH:MM

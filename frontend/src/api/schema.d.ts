@@ -381,6 +381,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/ports/{port_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * History
+         * @description Link and configuration events, and the devices seen on the port.
+         */
+        get: operations["history_api_v1_devices__device_id__ports__port_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{site_id}/free-ports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Free Ports */
+        get: operations["free_ports_api_v1_sites__site_id__free_ports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{site_id}/compliance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Site Compliance */
+        get: operations["site_compliance_api_v1_sites__site_id__compliance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Rules */
+        get: operations["list_rules_api_v1_compliance_rules_get"];
+        put?: never;
+        /** Create Rule */
+        post: operations["create_rule_api_v1_compliance_rules_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/compliance-rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Rule */
+        put: operations["update_rule_api_v1_compliance_rules__rule_id__put"];
+        post?: never;
+        /** Delete Rule */
+        delete: operations["delete_rule_api_v1_compliance_rules__rule_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sites/{site_id}/topology": {
         parameters: {
             query?: never;
@@ -1200,6 +1290,77 @@ export interface components {
             /** Active */
             active: boolean;
         };
+        /** ComplianceDeviceOut */
+        ComplianceDeviceOut: {
+            /** Device Id */
+            device_id: number;
+            /** Device Name */
+            device_name: string;
+            /** Backup At */
+            backup_at: string | null;
+            /** Results */
+            results: components["schemas"]["ComplianceResultOut"][];
+        };
+        /**
+         * ComplianceMode
+         * @enum {string}
+         */
+        ComplianceMode: "require" | "forbid";
+        /** ComplianceOut */
+        ComplianceOut: {
+            /** Rules */
+            rules: components["schemas"]["ComplianceRuleOut"][];
+            /** Devices */
+            devices: components["schemas"]["ComplianceDeviceOut"][];
+        };
+        /** ComplianceResultOut */
+        ComplianceResultOut: {
+            /** Rule Id */
+            rule_id: number;
+            /** Passed */
+            passed: boolean | null;
+            /** Lines */
+            lines: string[];
+        };
+        /** ComplianceRuleIn */
+        ComplianceRuleIn: {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            mode: components["schemas"]["ComplianceMode"];
+            /** Pattern */
+            pattern: string;
+            /**
+             * Models
+             * @default []
+             */
+            models: components["schemas"]["DeviceModel"][];
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
+        /** ComplianceRuleOut */
+        ComplianceRuleOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            mode: components["schemas"]["ComplianceMode"];
+            /** Pattern */
+            pattern: string;
+            /** Models */
+            models: string[];
+            /** Enabled */
+            enabled: boolean;
+        };
         /** ConsoleIn */
         ConsoleIn: {
             /** Command */
@@ -1435,6 +1596,38 @@ export interface components {
              * Format: date-time
              */
             seen_at: string;
+        };
+        /** FreePortOut */
+        FreePortOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Admin Up */
+            admin_up: boolean;
+            /** Down Since */
+            down_since: string | null;
+            /** Last Device At */
+            last_device_at: string | null;
+            /** Untagged Vlans */
+            untagged_vlans: number[];
+            /** Poe */
+            poe: boolean;
+        };
+        /** FreePortsDeviceOut */
+        FreePortsDeviceOut: {
+            /** Device Id */
+            device_id: number;
+            /** Device Name */
+            device_name: string;
+            /** Room */
+            room: string | null;
+            /** Building */
+            building: string | null;
+            /** Ports */
+            ports: components["schemas"]["FreePortOut"][];
         };
         /** GatewayIn */
         GatewayIn: {
@@ -1702,6 +1895,52 @@ export interface components {
             remove_tagged: number[];
             /** Profile Id */
             profile_id?: number | null;
+        };
+        /** PortDeviceOut */
+        PortDeviceOut: {
+            /** Mac Address */
+            mac_address: string;
+            /** Vid */
+            vid: number | null;
+            /**
+             * First Seen At
+             * Format: date-time
+             */
+            first_seen_at: string;
+            /**
+             * Last Seen At
+             * Format: date-time
+             */
+            last_seen_at: string;
+            /** Vendor */
+            vendor: string | null;
+            /** Ip Address */
+            ip_address: string | null;
+            /** Hostname */
+            hostname: string | null;
+        };
+        /** PortEventOut */
+        PortEventOut: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Kind */
+            kind: string;
+            /** Actor */
+            actor: string | null;
+            /** Old */
+            old?: unknown;
+            /** New */
+            new?: unknown;
+        };
+        /** PortHistoryOut */
+        PortHistoryOut: {
+            /** Events */
+            events: components["schemas"]["PortEventOut"][];
+            /** Devices */
+            devices: components["schemas"]["PortDeviceOut"][];
         };
         /**
          * PortKind
@@ -2988,6 +3227,222 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeviceHintOut"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    history_api_v1_devices__device_id__ports__port_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: number;
+                port_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortHistoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    free_ports_api_v1_sites__site_id__free_ports_get: {
+        parameters: {
+            query?: {
+                building_id?: number | null;
+                room_id?: number | null;
+                min_days?: number;
+                include_disabled?: boolean;
+            };
+            header?: never;
+            path: {
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreePortsDeviceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    site_compliance_api_v1_sites__site_id__compliance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComplianceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_rules_api_v1_compliance_rules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComplianceRuleOut"][];
+                };
+            };
+        };
+    };
+    create_rule_api_v1_compliance_rules_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComplianceRuleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComplianceRuleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_rule_api_v1_compliance_rules__rule_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComplianceRuleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComplianceRuleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_rule_api_v1_compliance_rules__rule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

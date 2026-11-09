@@ -5,6 +5,8 @@ from app.models.clients import Client, DiscoveredHost, MacType, MacVendor, SnmpG
 from app.models.config import (
     Backup,
     BackupStatus,
+    ComplianceMode,
+    ComplianceRule,
     Job,
     JobStatus,
     PortProfile,
@@ -12,6 +14,7 @@ from app.models.config import (
     SshPublicKey,
 )
 from app.models.device import CredentialProfile, Device, DeviceModel, DeviceStatus, SnmpVersion
+from app.models.history import PortEvent, PortEventKind, PortMacSighting
 from app.models.inventory import (
     ArpEntry,
     DevicePollState,
@@ -36,6 +39,8 @@ __all__ = [
     "Building",
     "BuiltinRole",
     "Client",
+    "ComplianceMode",
+    "ComplianceRule",
     "CredentialProfile",
     "Device",
     "DeviceModel",
@@ -56,6 +61,9 @@ __all__ = [
     "PollTask",
     "Port",
     "PortCounterSample",
+    "PortEvent",
+    "PortEventKind",
+    "PortMacSighting",
     "PortProfile",
     "PortVlan",
     "Role",

@@ -8,6 +8,14 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-09
+
+### Hinzugefügt
+
+- Konfigurationsregeln: Regeln wie „NTP-Server gesetzt“ oder „kein Telnet“ (regulärer Ausdruck, „muss enthalten“ / „darf nicht enthalten“, optional nur für bestimmte Modelle) werden gegen das neueste Backup jedes Switches geprüft; Übersicht als Matrix mit den passenden Zeilen (nur für Benutzer, die Backups herunterladen dürfen)
+- Freie Ports: Access-Ports ohne Link, an denen seit einer wählbaren Zeit kein Gerät war, gefiltert nach Gebäude oder Raum und optional nur PoE; Klick springt zum Port
+- Port-Verlauf (aufgeklappter Port): Link up/down, Geschwindigkeitswechsel, Änderungen in cesma-ng (mit Benutzer) und direkt am Switch (mit alt/neu), dazu alle Geräte, die an diesem Port waren (MAC, Hersteller, IP/Hostname, erstmals/zuletzt gesehen); 90 Tage aufbewahrt (`CESMA_RETENTION_PORT_HISTORY_DAYS`)
+
 ## [0.4.0] - 2026-11-09
 
 ### Hinzugefügt
@@ -115,7 +123,8 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 - Audit-Log mit alten und neuen Werten
 - Deutsch/Englisch, Hell-/Dunkelmodus
 
-[Unreleased]: https://github.com/bluecraank/cesma-ng/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/bluecraank/cesma-ng/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/bluecraank/cesma-ng/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/bluecraank/cesma-ng/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bluecraank/cesma-ng/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/bluecraank/cesma-ng/compare/v0.1.0...v0.2.0

@@ -9,6 +9,7 @@ from app.core.db import ensure_utc
 from app.domain.switch import PoeStatus, PortKind
 from app.models import (
     AuditLevel,
+    ComplianceMode,
     DeviceModel,
     DeviceStatus,
     NotificationKind,
@@ -537,6 +538,87 @@ class PortStatPoint(BaseModel):
     out_bps: int
     in_errors: int
     out_errors: int
+
+
+class PortEventOut(BaseModel):
+    at: UtcDatetime
+    kind: str  # link_up | link_down | speed | configured | changed
+    actor: str | None
+    old: Any = None
+    new: Any = None
+
+
+class PortDeviceOut(BaseModel):
+    mac_address: str
+    vid: int | None
+    first_seen_at: UtcDatetime
+    last_seen_at: UtcDatetime
+    vendor: str | None
+    ip_address: str | None
+    hostname: str | None
+
+
+class PortHistoryOut(BaseModel):
+    events: list[PortEventOut]
+    devices: list[PortDeviceOut]
+
+
+class FreePortOut(BaseModel):
+    id: int
+    name: str
+    description: str
+    admin_up: bool
+    down_since: UtcDatetime | None
+    last_device_at: UtcDatetime | None
+    untagged_vlans: list[int]
+    poe: bool
+
+
+class FreePortsDeviceOut(BaseModel):
+    device_id: int
+    device_name: str
+    room: str | None
+    building: str | None
+    ports: list[FreePortOut]
+
+
+class ComplianceRuleIn(BaseModel):
+    name: str = Name
+    description: str = Field(default="", max_length=255)
+    mode: ComplianceMode
+    pattern: str = Field(min_length=1, max_length=500)
+    models: list[DeviceModel] = []
+    enabled: bool = True
+
+
+class ComplianceRuleOut(ORM):
+    id: int
+    name: str
+    description: str
+    mode: ComplianceMode
+    pattern: str
+    models: list[str]
+    enabled: bool
+
+
+class ComplianceResultOut(BaseModel):
+    rule_id: int
+    #: None: no backup to check yet
+    passed: bool | None
+    #: matching lines (only for users who may read backups)
+    lines: list[str]
+
+
+class ComplianceDeviceOut(BaseModel):
+    device_id: int
+    device_name: str
+    backup_at: UtcDatetime | None
+    results: list[ComplianceResultOut]
+
+
+class ComplianceOut(BaseModel):
+    rules: list[ComplianceRuleOut]
+    devices: list[ComplianceDeviceOut]
 
 
 class PortStatsOut(BaseModel):

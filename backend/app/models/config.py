@@ -94,6 +94,27 @@ class Job(Base):
     error: Mapped[str | None] = mapped_column(Text)
 
 
+class ComplianceMode(StrEnum):
+    REQUIRE = "require"  # the configuration must contain a line matching the pattern
+    FORBID = "forbid"  # no line may match
+
+
+class ComplianceRule(TimestampMixin, Base):
+    """A rule every backed-up configuration is checked against (e.g. "NTP set", "no telnet")."""
+
+    __tablename__ = "compliance_rules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    description: Mapped[str] = mapped_column(String(255), default="")
+    mode: Mapped[ComplianceMode] = mapped_column(str_enum(ComplianceMode, 10))
+    #: regular expression, matched per line (case-insensitive)
+    pattern: Mapped[str] = mapped_column(String(500))
+    #: device models the rule applies to; empty = all
+    models: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    enabled: Mapped[bool] = mapped_column(default=True)
+
+
 class SshPublicKey(TimestampMixin, Base):
     """A user's public key; uploaded to the switches of sites where the user has SSH access.
 
