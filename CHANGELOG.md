@@ -8,6 +8,10 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+### Behoben
+
+- Docker: eigene Ports für die Oberfläche (`CESMA_HTTP_PORT`, `CESMA_HTTPS_PORT`); die Weiterleitung von HTTP auf HTTPS nutzt jetzt den eingestellten Port statt immer 443
+
 ## [0.3.0] - 2026-11-09
 
 ### Hinzugefügt

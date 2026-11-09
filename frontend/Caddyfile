@@ -1,10 +1,18 @@
 {
-	# Certificates: set CESMA_SITE_ADDRESS to the DNS name. For intranet names without
-	# public DNS, "tls internal" below issues a certificate from Caddy's own CA.
+	# Certificates: set CESMA_SITE_ADDRESS to the DNS name(s), comma-separated, IP addresses
+	# allowed (e.g. "cesma.domain.local, 10.0.0.5"). For intranet names without public DNS,
+	# "tls internal" below issues a certificate from Caddy's own CA.
 	admin off
+	# Caddy's own redirect would always point to port 443; the block below uses the
+	# published port instead (CESMA_HTTPS_PORT, see docker-compose.yml).
+	auto_https disable_redirects
 }
 
-{$CESMA_SITE_ADDRESS::443} {
+http:// {
+	redir https://{host}:{$CESMA_HTTPS_PORT:443}{uri} permanent
+}
+
+{$CESMA_SITE_ADDRESS:localhost} {
 	tls {$CESMA_TLS:internal}
 	encode zstd gzip
 
