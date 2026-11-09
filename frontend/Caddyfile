@@ -6,6 +6,9 @@
 	# Caddy's own redirect would always point to port 443; the block below uses the
 	# published port instead (CESMA_HTTPS_PORT, see docker-compose.yml).
 	auto_https disable_redirects
+	# Browsers send no server name (SNI) when the address is an IP; Caddy then uses the
+	# certificate of this name. Set CESMA_DEFAULT_SNI to the IP when opening cesma-ng by IP.
+	default_sni {$CESMA_DEFAULT_SNI:localhost}
 }
 
 http:// {
