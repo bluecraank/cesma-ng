@@ -127,7 +127,8 @@ onBeforeUnmount(() => cy?.destroy())
       </div>
     </div>
     <div class="card relative min-h-96 flex-1 overflow-hidden">
-      <div ref="container" class="absolute inset-0" />
+      <!-- cytoscape sets position: relative on its container, so it must not be the absolute element -->
+      <div class="absolute inset-0"><div ref="container" class="size-full" /></div>
       <div class="absolute bottom-3 left-3 flex flex-wrap gap-3 rounded-md bg-white/80 px-3 py-2 text-xs backdrop-blur dark:bg-gray-900/80">
         <span v-for="(color, status) in STATUS_COLORS" :key="status" class="flex items-center gap-1.5">
           <span class="size-2.5 rounded-sm" :style="{ background: color }" /> {{ t(`device.statuses.${status}`) }}
