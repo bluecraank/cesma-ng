@@ -401,6 +401,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sites/{site_id}/link-watch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Watch Links
+         * @description Live port finder: scan link states now (throttled) and list ports that went up.
+         */
+        post: operations["watch_links_api_v1_sites__site_id__link_watch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sites/{site_id}/switchports": {
         parameters: {
             query?: never;
@@ -1701,6 +1721,57 @@ export interface components {
             log: string;
             /** Error */
             error: string | null;
+        };
+        /** LinkUpOut */
+        LinkUpOut: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Port Id */
+            port_id: number;
+            /** Port */
+            port: string;
+            /** Description */
+            description: string;
+            /** Still Up */
+            still_up: boolean;
+            /** Uplink */
+            uplink: boolean;
+            /** Speed Mbps */
+            speed_mbps: number | null;
+            /** Untagged Vlans */
+            untagged_vlans: number[];
+            /** Device Id */
+            device_id: number;
+            /** Device Name */
+            device_name: string;
+            /** Building */
+            building: string | null;
+            /** Room */
+            room: string | null;
+            /** Connected */
+            connected: components["schemas"]["ConnectedDeviceOut"][];
+            /** Mac Count */
+            mac_count: number;
+        };
+        /** LinkWatchIn */
+        LinkWatchIn: {
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+        };
+        /** LinkWatchOut */
+        LinkWatchOut: {
+            /** Scanned At */
+            scanned_at: string | null;
+            /** Unreachable */
+            unreachable: string[];
+            /** Events */
+            events: components["schemas"]["LinkUpOut"][];
         };
         /** LldpNeighborOut */
         LldpNeighborOut: {
@@ -3294,6 +3365,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortHistoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    watch_links_api_v1_sites__site_id__link_watch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkWatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkWatchOut"];
                 };
             };
             /** @description Validation Error */

@@ -603,6 +603,35 @@ class SwitchPortsDeviceOut(BaseModel):
     ports: list[SwitchPortOut]
 
 
+class LinkWatchIn(BaseModel):
+    #: report ports that went up from this moment on (when the viewer switched the finder on)
+    since: UtcDatetime
+
+
+class LinkUpOut(BaseModel):
+    at: UtcDatetime
+    port_id: int
+    port: str
+    description: str
+    still_up: bool
+    uplink: bool
+    speed_mbps: int | None
+    untagged_vlans: list[int]
+    device_id: int
+    device_name: str
+    building: str | None
+    room: str | None
+    connected: list[ConnectedDeviceOut]
+    mac_count: int
+
+
+class LinkWatchOut(BaseModel):
+    scanned_at: UtcDatetime | None
+    #: switches that did not answer the link scan
+    unreachable: list[str]
+    events: list[LinkUpOut]
+
+
 class ComplianceRuleIn(BaseModel):
     name: str = Name
     description: str = Field(default="", max_length=255)

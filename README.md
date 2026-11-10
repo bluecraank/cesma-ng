@@ -50,6 +50,7 @@ Die Änderungen pro Version stehen im [CHANGELOG](CHANGELOG.md). Die Anwendung z
   - Audit-Log mit alten und neuen Werten
   - Konfigurationsregeln, geprüft gegen die Backups
   - Switchports: Frontansicht aller Switches mit freien Ports pro Gebäude/Raum
+  - Port-Erkennung: live sehen, welcher Port gerade auf UP geht und welches Gerät daran hängt
   - Port-Verlauf: Link- und Konfigurationsänderungen, angeschlossene Geräte
   - globale Suche (Strg+K)
   - Konsole für lesende Befehle

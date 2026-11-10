@@ -469,6 +469,18 @@ export default {
     },
   },
   vlanPicker: { placeholder: 'VLAN-ID oder Name eingeben …', unknownHint: 'Dieses VLAN gibt es am Standort nicht' },
+  finder: {
+    title: 'Port-Erkennung',
+    hint: 'Jemand schließt irgendwo ein Gerät an? Einschalten – cesma-ng zeigt dann live, welcher Port gerade auf UP gegangen ist und welches Gerät (MAC, IP) daran hängt.',
+    start: 'Einschalten',
+    stop: 'Ausschalten',
+    running: 'Läuft – prüft alle 5 Sekunden alle Switches des Standorts (schaltet sich nach 15 Minuten ab)',
+    lastScan: 'zuletzt {time}',
+    waiting: 'Warte auf einen Port, der auf UP geht …',
+    noMacYet: 'Link ist da, warte auf die MAC-Adresse des Geräts …',
+    downAgain: 'wieder down',
+    unreachable: 'Nicht erreichbar: {names}',
+  },
   switchports: {
     connected: 'Verbunden',
     moreDevices: '+ {n} weitere Geräte',

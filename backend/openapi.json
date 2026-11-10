@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Cesma NG",
-    "version": "0.8.0"
+    "version": "0.9.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -1260,6 +1260,59 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PortHistoryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{site_id}/link-watch": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Watch Links",
+        "description": "Live port finder: scan link states now (throttled) and list ports that went up.",
+        "operationId": "watch_links_api_v1_sites__site_id__link_watch_post",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkWatchIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkWatchOut"
                 }
               }
             }
@@ -5938,6 +5991,163 @@
           "error"
         ],
         "title": "JobOut"
+      },
+      "LinkUpOut": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "port_id": {
+            "type": "integer",
+            "title": "Port Id"
+          },
+          "port": {
+            "type": "string",
+            "title": "Port"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "still_up": {
+            "type": "boolean",
+            "title": "Still Up"
+          },
+          "uplink": {
+            "type": "boolean",
+            "title": "Uplink"
+          },
+          "speed_mbps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed Mbps"
+          },
+          "untagged_vlans": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Untagged Vlans"
+          },
+          "device_id": {
+            "type": "integer",
+            "title": "Device Id"
+          },
+          "device_name": {
+            "type": "string",
+            "title": "Device Name"
+          },
+          "building": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building"
+          },
+          "room": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room"
+          },
+          "connected": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectedDeviceOut"
+            },
+            "type": "array",
+            "title": "Connected"
+          },
+          "mac_count": {
+            "type": "integer",
+            "title": "Mac Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "port_id",
+          "port",
+          "description",
+          "still_up",
+          "uplink",
+          "speed_mbps",
+          "untagged_vlans",
+          "device_id",
+          "device_name",
+          "building",
+          "room",
+          "connected",
+          "mac_count"
+        ],
+        "title": "LinkUpOut"
+      },
+      "LinkWatchIn": {
+        "properties": {
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Since"
+          }
+        },
+        "type": "object",
+        "required": [
+          "since"
+        ],
+        "title": "LinkWatchIn"
+      },
+      "LinkWatchOut": {
+        "properties": {
+          "scanned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scanned At"
+          },
+          "unreachable": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unreachable"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/LinkUpOut"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scanned_at",
+          "unreachable",
+          "events"
+        ],
+        "title": "LinkWatchOut"
       },
       "LldpNeighborOut": {
         "properties": {

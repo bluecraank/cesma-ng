@@ -168,6 +168,15 @@ class SnmpSwitchDriver:
             )
         return ports
 
+    async def read_link_states(self) -> dict[int, bool]:
+        """Only the link state per ifIndex: one small walk, for the live port finder."""
+        rows = await self.snmp.walk(mib.IF_OPER)
+        return {
+            idx[0]: mib.integer(v) == 1
+            for idx, v in column(rows, mib.IF_OPER).items()
+            if len(idx) == 1
+        }
+
     async def read_fdb(self) -> list[FdbEntry]:
         rows = await self._walk_all(mib.DOT1Q_VLAN_FDB_ID, mib.DOT1Q_FDB_PORT, mib.DOT1Q_FDB_STATUS)
         if not column(rows, mib.DOT1Q_FDB_PORT):  # no Q-BRIDGE: plain BRIDGE-MIB

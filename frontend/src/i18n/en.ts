@@ -471,6 +471,18 @@ const en: typeof de = {
     },
   },
   vlanPicker: { placeholder: 'Type VLAN ID or name …', unknownHint: 'This VLAN does not exist at the site' },
+  finder: {
+    title: 'Port finder',
+    hint: 'Someone is plugging in a device somewhere? Switch on – cesma-ng shows live which port just went up and which device (MAC, IP) is connected.',
+    start: 'Switch on',
+    stop: 'Switch off',
+    running: 'Running – checks all switches of the site every 5 seconds (stops after 15 minutes)',
+    lastScan: 'last {time}',
+    waiting: 'Waiting for a port to go up …',
+    noMacYet: 'Link is up, waiting for the device MAC address …',
+    downAgain: 'down again',
+    unreachable: 'Not reachable: {names}',
+  },
   switchports: {
     connected: 'Connected',
     moreDevices: '+ {n} more devices',

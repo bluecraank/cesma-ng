@@ -17,6 +17,8 @@ from app.schemas import (
     DeviceHintOut,
     DeviceVlanOut,
     FdbEntryOut,
+    LinkWatchIn,
+    LinkWatchOut,
     LldpNeighborOut,
     PollStateOut,
     PortHistoryOut,
@@ -25,7 +27,14 @@ from app.schemas import (
     SwitchPortsDeviceOut,
     TopologyOut,
 )
-from app.services import compliance, credentials, inventory_query, polling, port_history
+from app.services import (
+    compliance,
+    credentials,
+    inventory_query,
+    link_watch,
+    polling,
+    port_history,
+)
 from app.services.access import require_permission_anywhere
 from app.services.device_hints import site_hints
 from app.services.devices import get_device
@@ -103,6 +112,19 @@ async def device_hints(
 async def history(device_id: int, port_id: int, db: Db, caller: CallerDep) -> object:
     """Link and configuration events, and the devices seen on the port."""
     return await port_history.port_history(db, caller, device_id, port_id)
+
+
+@router.post("/sites/{site_id}/link-watch", response_model=LinkWatchOut)
+async def watch_links(
+    site_id: int,
+    body: LinkWatchIn,
+    db: Db,
+    caller: CallerDep,
+    settings: AppSettings,
+    box: Annotated[SecretBox, Depends(get_secret_box)],
+) -> object:
+    """Live port finder: scan link states now (throttled) and list ports that went up."""
+    return await link_watch.scan(db, caller, site_id, since=body.since, settings=settings, box=box)
 
 
 @router.get("/sites/{site_id}/switchports", response_model=list[SwitchPortsDeviceOut])

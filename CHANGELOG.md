@@ -8,6 +8,12 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-10
+
+### Hinzugefügt
+
+- Port-Erkennung (Switchports): Jemand steckt irgendwo ein Gerät ein, ein anderer schaltet in cesma-ng die Erkennung ein und sieht live, welcher Port gerade auf UP gegangen ist – mit Switch, Port, Standort, VLAN und dem angeschlossenen Gerät (Hostname/IP, MAC, Hersteller); der Port blinkt zusätzlich in der Frontansicht. Dafür wird alle 5 Sekunden nur der Link-Status der Switches des Standorts abgefragt, die MAC-Tabelle eines Switches nur, wenn dort ein Port neu aktiv ist; mehrere Zuschauer teilen sich die Abfragen, nach 15 Minuten schaltet sich die Erkennung ab. Die Änderungen landen auch im Port-Verlauf.
+
 ## [0.8.0] - 2026-11-10
 
 ### Hinzugefügt

@@ -3,11 +3,12 @@
 from datetime import timedelta
 
 from httpx import AsyncClient
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 
 from app.core.config import Settings
 from app.core.db import utcnow
-from app.models import Backup, BackupStatus, PollTask, Port, PortMacSighting
+from app.models import Backup, BackupStatus, FdbEntry, PollTask, Port, PortMacSighting
+from app.services import link_watch
 from app.services.polling import driver_factory_for, poll_device
 from app.services.uplinks import uplink_port_ids
 from tests.conftest import grant
@@ -152,3 +153,42 @@ async def test_compliance_rules(
     await grant(alice, "bob", {site: "viewer"})
     seen = (await bob.get(f"/sites/{site}/compliance")).json()["devices"][0]["results"]
     assert all(r["lines"] == [] for r in seen)
+
+
+async def test_link_watch_finds_the_port_that_just_came_up(
+    alice: AsyncClient, bob: AsyncClient, app, settings: Settings
+) -> None:  # type: ignore[no-untyped-def]
+    settings = await _simulated_app(app, settings)
+    device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
+    await _poll(app, settings, device_id, PollTask.FDB)
+    site = (await alice.get(f"/devices/{device_id}")).json()["site_id"]
+    ports = {p["name"]: p for p in (await alice.get(f"/devices/{device_id}/ports")).json()}
+    async with app.state.database.sessionmaker() as db:
+        with_mac = set((await db.execute(select(FdbEntry.port_id))).scalars())
+    target = next(
+        p for p in ports.values() if p["oper_up"] and not p["is_uplink"] and p["id"] in with_mac
+    )
+    # the switch says "up", cesma still thinks "down" and has no MAC entry yet: a device was
+    # just plugged in
+    async with app.state.database.sessionmaker() as db:
+        await db.execute(update(Port).where(Port.id == target["id"]).values(oper_up=False))
+        await db.execute(delete(FdbEntry).where(FdbEntry.port_id == target["id"]))
+        await db.commit()
+    link_watch._sites.clear()
+    link_watch._last_fdb.clear()
+
+    since = (utcnow() - timedelta(seconds=5)).isoformat()
+    assert (await bob.post(f"/sites/{site}/link-watch", json={"since": since})).status_code == 403
+    result = (await alice.post(f"/sites/{site}/link-watch", json={"since": since})).json()
+    assert result["unreachable"] == []
+    found = [e for e in result["events"] if e["port_id"] == target["id"]]
+    assert len(found) == 1 and found[0]["still_up"] and found[0]["device_name"]
+    assert found[0]["connected"] and found[0]["mac_count"] >= 1  # MAC table was read again
+
+    # nothing new happened: no new events after now, and the scan is throttled
+    later = utcnow().isoformat()
+    assert (await alice.post(f"/sites/{site}/link-watch", json={"since": later})).json()[
+        "events"
+    ] == []
+    history = (await alice.get(f"/devices/{device_id}/ports/{target['id']}/history")).json()
+    assert history["events"][0]["kind"] == "link_up"

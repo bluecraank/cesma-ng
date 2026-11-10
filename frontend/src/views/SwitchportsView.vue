@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** Front panel view of all switches: which ports are in use, which are free for a new connection. */
-import { MapPinIcon } from '@heroicons/vue/20/solid'
-import { computed, ref, watch } from 'vue'
+import { MapPinIcon, SignalIcon } from '@heroicons/vue/20/solid'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/api/client'
 import type { components } from '@/api/schema'
@@ -15,6 +15,8 @@ import { panelLayout, portLabel } from '@/utils/switchPanel'
 type SwitchPorts = components['schemas']['SwitchPortsDeviceOut']
 type SwitchPort = components['schemas']['SwitchPortOut']
 type State = 'free' | 'up' | 'uplink' | 'down' | 'disabled'
+type LinkWatch = components['schemas']['LinkWatchOut']
+type LinkUp = components['schemas']['LinkUpOut']
 
 const { t, locale } = useI18n()
 const notify = useNotify()
@@ -64,6 +66,60 @@ async function load(): Promise<void> {
 }
 
 watch(() => sites.currentId, () => (place.value = ''))
+
+/*
+ * Port finder: someone plugs a device in somewhere, the viewer sees which port just went up.
+ * While switched on, the link states are scanned every few seconds (throttled on the server).
+ */
+const FINDER_EVERY_MS = 5000
+const FINDER_MAX_MS = 15 * 60 * 1000
+const finder = ref(false)
+const finderSince = ref<string | null>(null)
+const finderEvents = ref<LinkUp[]>([])
+const finderInfo = ref<{ scannedAt: string | null; unreachable: string[] }>({ scannedAt: null, unreachable: [] })
+let finderTimer: ReturnType<typeof setTimeout> | null = null
+let finderStarted = 0
+const foundPorts = computed(() => new Set(finderEvents.value.filter((e) => e.still_up).map((e) => e.port_id)))
+
+async function finderTick(): Promise<void> {
+  if (!finder.value || sites.currentId === null || !finderSince.value) return
+  try {
+    const res = await api.post<LinkWatch>(`/sites/${sites.currentId}/link-watch`, { since: finderSince.value })
+    const before = finderEvents.value.length
+    finderEvents.value = res.events
+    finderInfo.value = { scannedAt: res.scanned_at, unreachable: res.unreachable }
+    if (res.events.length !== before) await load() // show the new link state in the panels
+  } catch (err) {
+    notify.error(err)
+  }
+  if (Date.now() - finderStarted > FINDER_MAX_MS) {
+    stopFinder()
+    return
+  }
+  if (finder.value) finderTimer = setTimeout(finderTick, FINDER_EVERY_MS)
+}
+
+function startFinder(): void {
+  finder.value = true
+  finderStarted = Date.now()
+  finderSince.value = new Date().toISOString()
+  finderEvents.value = []
+  finderInfo.value = { scannedAt: null, unreachable: [] }
+  void finderTick()
+}
+
+function stopFinder(): void {
+  finder.value = false
+  if (finderTimer) clearTimeout(finderTimer)
+  finderTimer = null
+}
+
+watch(() => sites.currentId, stopFinder)
+onBeforeUnmount(stopFinder)
+
+function time(value: string): string {
+  return new Date(value).toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
 watch([() => sites.currentId, place, minDays, live, includeDisabled], load, { immediate: true })
 
 /** Colours are fixed (not theme dependent) because the panel itself is always dark. */
@@ -140,6 +196,66 @@ function facts(p: SwitchPort): string[] {
       <span class="ml-auto pb-1 text-sm text-gray-500 dark:text-gray-400">{{ t('switchports.summary', { free: totalFree, switches: switches.length }) }}</span>
     </div>
 
+    <!-- port finder -->
+    <section class="card p-4" :class="finder && 'ring-2 ring-amber-400'">
+      <div class="flex flex-wrap items-center gap-4">
+        <SignalIcon class="size-6 shrink-0" :class="finder ? 'animate-pulse text-amber-500' : 'text-gray-400'" />
+        <div class="min-w-0 flex-1">
+          <p class="font-semibold">{{ t('finder.title') }}</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">
+            <template v-if="!finder">{{ t('finder.hint') }}</template>
+            <template v-else>
+              {{ t('finder.running') }}
+              <span v-if="finderInfo.scannedAt"> · {{ t('finder.lastScan', { time: time(finderInfo.scannedAt) }) }}</span>
+            </template>
+          </p>
+        </div>
+        <button type="button" class="btn" :class="finder ? 'btn-secondary' : 'btn-primary'" @click="finder ? stopFinder() : startFinder()">
+          {{ finder ? t('finder.stop') : t('finder.start') }}
+        </button>
+      </div>
+      <p v-if="finder && finderInfo.unreachable.length" class="mt-3 text-xs text-amber-700 dark:text-amber-400">
+        {{ t('finder.unreachable', { names: finderInfo.unreachable.join(', ') }) }}
+      </p>
+      <div v-if="finder || finderEvents.length" class="mt-4 space-y-2">
+        <p v-if="!finderEvents.length" class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+          <UiSpinner class="size-4" /> {{ t('finder.waiting') }}
+        </p>
+        <RouterLink
+          v-for="e in finderEvents"
+          :key="`${e.port_id}-${e.at}`"
+          :to="{ name: 'device', params: { id: e.device_id }, query: { tab: 'ports', port: e.port_id } }"
+          class="flex flex-wrap items-start gap-x-6 gap-y-2 rounded-lg p-3 ring-1 hover:bg-gray-50 dark:hover:bg-white/5"
+          :class="e.still_up ? 'ring-amber-300 dark:ring-amber-500/40' : 'opacity-60 ring-gray-200 dark:ring-white/10'"
+        >
+          <div class="min-w-48">
+            <p class="text-lg font-semibold">
+              {{ e.device_name }} · <span class="font-mono">{{ e.port }}</span>
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ time(e.at) }}
+              <template v-if="e.building || e.room"> · {{ [e.building, e.room].filter(Boolean).join(' · ') }}</template>
+              <template v-if="e.untagged_vlans.length"> · VLAN {{ e.untagged_vlans.join(', ') }}</template>
+            </p>
+            <span v-if="!e.still_up" class="badge badge-gray mt-1">{{ t('finder.downAgain') }}</span>
+            <span v-else-if="e.uplink" class="badge badge-indigo mt-1">Uplink</span>
+          </div>
+          <div class="min-w-0 flex-1 text-sm">
+            <p v-if="e.still_up && !e.connected.length" class="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+              <UiSpinner class="size-4" /> {{ t('finder.noMacYet') }}
+            </p>
+            <div v-for="c in e.connected" :key="c.mac_address" class="mb-1">
+              <span class="font-medium">{{ c.hostname || c.ip_address || c.vendor || c.mac_address }}</span>
+              <span class="ml-2 font-mono text-xs text-gray-500 dark:text-gray-400">
+                {{ [c.hostname || c.ip_address ? c.mac_address : null, c.ip_address && c.hostname ? c.ip_address : null, c.hostname || c.ip_address ? c.vendor : null].filter(Boolean).join(' · ') || (c.vendor ? c.mac_address : '') }}
+              </span>
+            </div>
+            <p v-if="e.mac_count > e.connected.length" class="text-xs text-gray-500">{{ t('switchports.moreDevices', { n: e.mac_count - e.connected.length }) }}</p>
+          </div>
+        </RouterLink>
+      </div>
+    </section>
+
     <div class="flex flex-wrap items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
       <span v-for="s in LEGEND" :key="s" class="flex items-center gap-1.5">
         <span class="inline-block size-3.5 rounded-sm" :class="STYLE[s]" />
@@ -177,7 +293,7 @@ function facts(p: SwitchPort): string[] {
                     v-if="p"
                     :to="{ name: 'device', params: { id: d.device_id }, query: { tab: 'ports', port: p.id } }"
                     class="relative flex h-6 w-6 2xl:h-7 2xl:w-8 items-center justify-center rounded-sm font-mono text-[0.5625rem] 2xl:text-[0.625rem] leading-none font-semibold transition"
-                    :class="STYLE[state(p)]"
+                    :class="[STYLE[state(p)], foundPorts.has(p.id) && 'z-10 animate-pulse ring-4 ring-amber-400']"
                     @mouseenter="showHover(p, $event)"
                     @mouseleave="hover = null"
                     @focus="showHover(p, $event as unknown as MouseEvent)"
