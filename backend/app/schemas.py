@@ -603,6 +603,38 @@ class SwitchPortsDeviceOut(BaseModel):
     ports: list[SwitchPortOut]
 
 
+class OverviewPortsOut(BaseModel):
+    total: int
+    up: int
+    #: access ports without link for UNUSED_AFTER_DAYS (as in the reports)
+    free: int
+    uplinks: int
+    uplinks_down: int
+
+
+class OverviewPoeOut(BaseModel):
+    ports: int
+    delivering: int
+    faults: int
+
+
+class OverviewBackupsOut(BaseModel):
+    ok_24h: int
+    failed_24h: int
+    #: devices without a successful backup in the last two days
+    stale: int
+
+
+class SiteOverviewOut(BaseModel):
+    ports: OverviewPortsOut
+    poe: OverviewPoeOut
+    clients_active: int
+    vlans: int
+    notifications_open: int
+    link_changes_24h: int
+    backups: OverviewBackupsOut
+
+
 class LinkWatchIn(BaseModel):
     #: report ports that went up from this moment on (when the viewer switched the finder on)
     since: UtcDatetime

@@ -528,6 +528,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sites/{site_id}/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Overview
+         * @description Key figures for the dashboard.
+         */
+        get: operations["overview_api_v1_sites__site_id__overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sites/{site_id}/reports": {
         parameters: {
             query?: never;
@@ -1874,6 +1894,37 @@ export interface components {
          * @enum {string}
          */
         NotificationSeverity: "info" | "warning" | "critical";
+        /** OverviewBackupsOut */
+        OverviewBackupsOut: {
+            /** Ok 24H */
+            ok_24h: number;
+            /** Failed 24H */
+            failed_24h: number;
+            /** Stale */
+            stale: number;
+        };
+        /** OverviewPoeOut */
+        OverviewPoeOut: {
+            /** Ports */
+            ports: number;
+            /** Delivering */
+            delivering: number;
+            /** Faults */
+            faults: number;
+        };
+        /** OverviewPortsOut */
+        OverviewPortsOut: {
+            /** Total */
+            total: number;
+            /** Up */
+            up: number;
+            /** Free */
+            free: number;
+            /** Uplinks */
+            uplinks: number;
+            /** Uplinks Down */
+            uplinks_down: number;
+        };
         /** Page[AuditEntryOut] */
         Page_AuditEntryOut_: {
             /** Items */
@@ -2182,6 +2233,20 @@ export interface components {
             name: string;
             /** Buildings */
             buildings: components["schemas"]["BuildingOut"][];
+        };
+        /** SiteOverviewOut */
+        SiteOverviewOut: {
+            ports: components["schemas"]["OverviewPortsOut"];
+            poe: components["schemas"]["OverviewPoeOut"];
+            /** Clients Active */
+            clients_active: number;
+            /** Vlans */
+            vlans: number;
+            /** Notifications Open */
+            notifications_open: number;
+            /** Link Changes 24H */
+            link_changes_24h: number;
+            backups: components["schemas"]["OverviewBackupsOut"];
         };
         /** SiteRoleOut */
         SiteRoleOut: {
@@ -3655,6 +3720,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortStatsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    overview_api_v1_sites__site_id__overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteOverviewOut"];
                 };
             };
             /** @description Validation Error */

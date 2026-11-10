@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Cesma NG",
-    "version": "0.10.0"
+    "version": "0.11.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -1720,6 +1720,49 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PortStatsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{site_id}/overview": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Overview",
+        "description": "Key figures for the dashboard.",
+        "operationId": "overview_api_v1_sites__site_id__overview_get",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteOverviewOut"
                 }
               }
             }
@@ -6462,6 +6505,85 @@
         ],
         "title": "NotificationSeverity"
       },
+      "OverviewBackupsOut": {
+        "properties": {
+          "ok_24h": {
+            "type": "integer",
+            "title": "Ok 24H"
+          },
+          "failed_24h": {
+            "type": "integer",
+            "title": "Failed 24H"
+          },
+          "stale": {
+            "type": "integer",
+            "title": "Stale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok_24h",
+          "failed_24h",
+          "stale"
+        ],
+        "title": "OverviewBackupsOut"
+      },
+      "OverviewPoeOut": {
+        "properties": {
+          "ports": {
+            "type": "integer",
+            "title": "Ports"
+          },
+          "delivering": {
+            "type": "integer",
+            "title": "Delivering"
+          },
+          "faults": {
+            "type": "integer",
+            "title": "Faults"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ports",
+          "delivering",
+          "faults"
+        ],
+        "title": "OverviewPoeOut"
+      },
+      "OverviewPortsOut": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "up": {
+            "type": "integer",
+            "title": "Up"
+          },
+          "free": {
+            "type": "integer",
+            "title": "Free"
+          },
+          "uplinks": {
+            "type": "integer",
+            "title": "Uplinks"
+          },
+          "uplinks_down": {
+            "type": "integer",
+            "title": "Uplinks Down"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "up",
+          "free",
+          "uplinks",
+          "uplinks_down"
+        ],
+        "title": "OverviewPortsOut"
+      },
       "Page_AuditEntryOut_": {
         "properties": {
           "items": {
@@ -7398,6 +7520,46 @@
           "buildings"
         ],
         "title": "SiteOut"
+      },
+      "SiteOverviewOut": {
+        "properties": {
+          "ports": {
+            "$ref": "#/components/schemas/OverviewPortsOut"
+          },
+          "poe": {
+            "$ref": "#/components/schemas/OverviewPoeOut"
+          },
+          "clients_active": {
+            "type": "integer",
+            "title": "Clients Active"
+          },
+          "vlans": {
+            "type": "integer",
+            "title": "Vlans"
+          },
+          "notifications_open": {
+            "type": "integer",
+            "title": "Notifications Open"
+          },
+          "link_changes_24h": {
+            "type": "integer",
+            "title": "Link Changes 24H"
+          },
+          "backups": {
+            "$ref": "#/components/schemas/OverviewBackupsOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ports",
+          "poe",
+          "clients_active",
+          "vlans",
+          "notifications_open",
+          "link_changes_24h",
+          "backups"
+        ],
+        "title": "SiteOverviewOut"
       },
       "SiteRoleOut": {
         "properties": {

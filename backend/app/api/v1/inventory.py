@@ -24,6 +24,7 @@ from app.schemas import (
     PortHistoryOut,
     PortOut,
     PortStatsOut,
+    SiteOverviewOut,
     SwitchPortsDeviceOut,
     TopologyOut,
 )
@@ -38,6 +39,7 @@ from app.services import (
 from app.services.access import require_permission_anywhere
 from app.services.device_hints import site_hints
 from app.services.devices import get_device
+from app.services.overview import site_overview
 from app.services.port_stats import port_statistics
 from app.services.reports import site_report
 from app.services.topology import site_topology
@@ -194,6 +196,12 @@ async def port_stats(
     hours: Annotated[int, Query(ge=1, le=24 * 14)] = 24,
 ) -> object:
     return await port_statistics(db, caller, device_id, port_id, hours)
+
+
+@router.get("/sites/{site_id}/overview", response_model=SiteOverviewOut)
+async def overview(site_id: int, db: Db, caller: CallerDep) -> object:
+    """Key figures for the dashboard."""
+    return await site_overview(db, caller, site_id)
 
 
 @router.get("/sites/{site_id}/reports")

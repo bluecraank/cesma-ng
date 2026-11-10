@@ -8,6 +8,13 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-10
+
+### Hinzugefügt
+
+- Übersicht: zweite Reihe Kennzahlen – aktive Ports (mit Auslastungsbalken und Anzahl freier Ports), Uplinks, aktive Clients, PoE, Backups der letzten 24 h, offene Benachrichtigungen, Link-Wechsel und VLANs; jede Kachel führt zur passenden Seite, Probleme sind mit Symbol markiert
+- Übersicht: „Alle im Protokoll“ bei den letzten Ereignissen
+
 ## [0.10.0] - 2026-11-10
 
 ### Hinzugefügt

@@ -201,3 +201,16 @@ async def test_link_watch_finds_the_port_that_just_came_up(
     result = (await alice.post(f"/sites/{site}/link-watch", json={"since": since})).json()
     found = [e for e in result["events"] if e["port_id"] == target["id"]]
     assert len(found) == 1 and found[0]["link_ups"] == 2
+
+
+async def test_site_overview(alice: AsyncClient, bob: AsyncClient, app, settings: Settings) -> None:  # type: ignore[no-untyped-def]
+    settings = await _simulated_app(app, settings)
+    device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
+    site = (await alice.get(f"/devices/{device_id}")).json()["site_id"]
+    assert (await bob.get(f"/sites/{site}/overview")).status_code == 403
+    data = (await alice.get(f"/sites/{site}/overview")).json()
+    ports = data["ports"]
+    assert ports["total"] >= 48 and 0 < ports["up"] < ports["total"]
+    assert ports["free"] <= ports["total"] - ports["up"]
+    assert data["backups"]["stale"] == 1  # the switch has no backup yet
+    assert data["notifications_open"] >= 0 and data["clients_active"] >= 0
