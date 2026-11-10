@@ -87,7 +87,7 @@ watch(() => sites.currentId, load, { immediate: true })
               <td class="w-48">
                 <div class="flex items-center gap-2">
                   <div class="h-1.5 flex-1 rounded-full bg-gray-100 dark:bg-white/10">
-                    <div class="h-1.5 rounded-full bg-indigo-500" :style="{ width: `${f.total ? ((f.total - f.free.length) / f.total) * 100 : 0}%` }" />
+                    <div class="h-1.5 rounded-full bg-brand-500" :style="{ width: `${f.total ? ((f.total - f.free.length) / f.total) * 100 : 0}%` }" />
                   </div>
                   <span class="text-xs tabular-nums">{{ f.free.length }} / {{ f.total }}</span>
                 </div>

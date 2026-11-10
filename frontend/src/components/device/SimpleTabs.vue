@@ -47,7 +47,7 @@ const fdbRows = computed(() => {
         </thead>
         <tbody>
           <tr v-for="v in vlans" :key="v.vid">
-            <td class="font-mono font-medium">{{ v.vid }}</td>
+            <td class="font-medium">{{ v.vid }}</td>
             <td>{{ v.name }}</td>
             <td class="text-right tabular-nums">{{ v.untagged_ports }}</td>
             <td class="text-right tabular-nums">{{ v.tagged_ports }}</td>
@@ -68,8 +68,8 @@ const fdbRows = computed(() => {
           <tr v-for="e in fdbRows" :key="`${e.vid}-${e.mac_address}`">
             <td class="font-mono text-xs">{{ e.mac_address }}</td>
             <td class="tabular-nums">{{ e.vid ?? '—' }}</td>
-            <td class="font-mono text-xs">{{ e.port_name ?? '—' }}</td>
-            <td class="font-mono text-xs">{{ e.ip_addresses.join(', ') }}</td>
+            <td>{{ e.port_name ?? '—' }}</td>
+            <td>{{ e.ip_addresses.join(', ') }}</td>
           </tr>
         </tbody>
       </table>
@@ -86,14 +86,14 @@ const fdbRows = computed(() => {
         </thead>
         <tbody>
           <tr v-for="n in lldp" :key="n.id">
-            <td class="font-mono text-xs">{{ n.local_port_name }}</td>
+            <td>{{ n.local_port_name }}</td>
             <td>
               <RouterLink v-if="n.remote_device_id" :to="{ name: 'device', params: { id: n.remote_device_id } }" class="link">
                 {{ n.system_name || n.chassis_id }}
               </RouterLink>
               <span v-else>{{ n.system_name || n.chassis_id }}</span>
             </td>
-            <td class="font-mono text-xs">{{ n.remote_port_description || n.remote_port }}</td>
+            <td>{{ n.remote_port_description || n.remote_port }}</td>
             <td class="font-mono text-xs">{{ n.management_address ?? '' }}</td>
             <td class="max-w-80 truncate text-xs text-gray-500" :title="n.system_description">{{ n.system_description }}</td>
           </tr>

@@ -128,7 +128,7 @@ watch(() => sites.currentId, load, { immediate: true })
           <span v-if="summary.failing" class="badge badge-red">{{ t('compliance.failing', { n: summary.failing, total: summary.total }) }}</span>
           <span v-else class="badge badge-green">{{ t('compliance.allOk') }}</span>
           <span v-if="summary.noBackup" class="text-gray-500">{{ t('compliance.noBackup', { n: summary.noBackup }) }}</span>
-          <label class="ml-auto flex items-center gap-2"><input v-model="onlyFailing" type="checkbox" class="accent-indigo-600" /> {{ t('compliance.onlyFailing') }}</label>
+          <label class="ml-auto flex items-center gap-2"><input v-model="onlyFailing" type="checkbox" class="accent-brand-600" /> {{ t('compliance.onlyFailing') }}</label>
         </div>
 
         <div class="card table-wrap">
@@ -224,12 +224,12 @@ watch(() => sites.currentId, load, { immediate: true })
           <legend class="label">{{ t('compliance.models') }}</legend>
           <div class="flex flex-wrap gap-4">
             <label v-for="m in MODELS" :key="m" class="flex items-center gap-2 text-sm">
-              <input v-model="form.models" type="checkbox" :value="m" class="accent-indigo-600" /> {{ t(`device.models.${m}`) }}
+              <input v-model="form.models" type="checkbox" :value="m" class="accent-brand-600" /> {{ t(`device.models.${m}`) }}
             </label>
           </div>
           <p class="hint">{{ t('compliance.modelsHint') }}</p>
         </fieldset>
-        <label class="flex items-center gap-2 text-sm"><input v-model="form.enabled" type="checkbox" class="accent-indigo-600" /> {{ t('compliance.enabled') }}</label>
+        <label class="flex items-center gap-2 text-sm"><input v-model="form.enabled" type="checkbox" class="accent-brand-600" /> {{ t('compliance.enabled') }}</label>
       </form>
       <template #footer>
         <button type="button" class="btn btn-secondary" @click="ruleOpen = false">{{ t('common.cancel') }}</button>

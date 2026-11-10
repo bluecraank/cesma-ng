@@ -132,7 +132,7 @@ onMounted(load)
         <fieldset v-for="g in GROUPS" :key="g.key" class="space-y-2">
           <legend class="label mb-1">{{ t(`roles.group.${g.key}`) }}</legend>
           <label v-for="p in g.permissions" :key="p" class="flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-gray-50 dark:hover:bg-white/5">
-            <input type="checkbox" class="mt-0.5 accent-indigo-600" :checked="form.permissions.includes(p)" @change="togglePermission(p)" />
+            <input type="checkbox" class="mt-0.5 accent-brand-600" :checked="form.permissions.includes(p)" @change="togglePermission(p)" />
             <span>
               <span class="block text-sm font-medium">{{ t(`roles.perm.${p}`) }}</span>
               <span class="block text-xs text-gray-500">{{ t(`roles.permHint.${p}`) }}</span>

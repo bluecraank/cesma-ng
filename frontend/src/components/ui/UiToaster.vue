@@ -5,7 +5,7 @@ import { useToasts } from '@/composables/useToasts'
 
 const { toasts, dismiss } = useToasts()
 const icons = { success: CheckCircleIcon, error: XCircleIcon, info: InformationCircleIcon }
-const colors = { success: 'text-green-500', error: 'text-red-500', info: 'text-indigo-500' }
+const colors = { success: 'text-green-500', error: 'text-red-500', info: 'text-brand-500' }
 </script>
 
 <template>

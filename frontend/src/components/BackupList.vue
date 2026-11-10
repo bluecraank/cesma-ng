@@ -58,7 +58,7 @@ async function showDiff(backup: Backup): Promise<void> {
 function lineClass(line: string): string {
   if (line.startsWith('+') && !line.startsWith('+++')) return 'text-green-400'
   if (line.startsWith('-') && !line.startsWith('---')) return 'text-red-400'
-  if (line.startsWith('@@')) return 'text-indigo-300'
+  if (line.startsWith('@@')) return 'text-brand-300'
   return 'text-gray-300'
 }
 
@@ -88,7 +88,7 @@ function size(bytes: number): string {
           </td>
           <td>
             <span v-if="b.status === 'failed'" class="badge badge-red" :title="b.error ?? ''">{{ t('jobs.statuses.failed') }}</span>
-            <span v-else-if="b.changed" class="badge badge-indigo">{{ t('backups.changed') }}</span>
+            <span v-else-if="b.changed" class="badge badge-brand">{{ t('backups.changed') }}</span>
             <span v-else class="badge badge-gray">{{ t('backups.unchanged') }}</span>
             <p v-if="b.error" class="mt-1 max-w-md text-xs text-red-600 dark:text-red-400">{{ b.error }}</p>
           </td>

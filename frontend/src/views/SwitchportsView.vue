@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSitesStore } from '@/stores/sites'
 import { formatDateTime } from '@/utils/format'
 import { panelLayout, portLabel } from '@/utils/switchPanel'
+import { deviceLabel } from '@/utils/vendor'
 
 type SwitchPorts = components['schemas']['SwitchPortsDeviceOut']
 type SwitchPort = components['schemas']['SwitchPortOut']
@@ -186,15 +187,15 @@ function facts(p: SwitchPort): string[] {
             <option v-for="d in DAYS" :key="d" :value="d">{{ t('switchports.days', { n: d }) }}</option>
           </select>
           <label class="flex items-center gap-2 text-sm whitespace-nowrap" :title="t('switchports.liveHint')">
-            <input v-model="live" type="checkbox" class="accent-indigo-600" /> {{ t('switchports.live') }}
+            <input v-model="live" type="checkbox" class="accent-brand-600" /> {{ t('switchports.live') }}
           </label>
         </div>
       </div>
       <div class="flex flex-col gap-1 pb-1 text-sm">
-        <label class="flex items-center gap-2"><input v-model="onlyPoe" type="checkbox" class="accent-indigo-600" /> {{ t('switchports.onlyPoe') }}</label>
-        <label class="flex items-center gap-2"><input v-model="includeDisabled" type="checkbox" class="accent-indigo-600" /> {{ t('switchports.includeDisabled') }}</label>
+        <label class="flex items-center gap-2"><input v-model="onlyPoe" type="checkbox" class="accent-brand-600" /> {{ t('switchports.onlyPoe') }}</label>
+        <label class="flex items-center gap-2"><input v-model="includeDisabled" type="checkbox" class="accent-brand-600" /> {{ t('switchports.includeDisabled') }}</label>
       </div>
-      <label class="flex items-center gap-2 pb-1 text-sm"><input v-model="onlyWithFree" type="checkbox" class="accent-indigo-600" /> {{ t('switchports.onlyWithFree') }}</label>
+      <label class="flex items-center gap-2 pb-1 text-sm"><input v-model="onlyWithFree" type="checkbox" class="accent-brand-600" /> {{ t('switchports.onlyWithFree') }}</label>
       <span class="ml-auto pb-1 text-sm text-gray-500 dark:text-gray-400">{{ t('switchports.summary', { free: totalFree, switches: switches.length }) }}</span>
     </div>
 
@@ -241,17 +242,15 @@ function facts(p: SwitchPort): string[] {
             </p>
             <span v-if="e.link_ups > 1" class="badge badge-yellow mt-1 mr-1" :title="t('finder.flappingHint')">{{ t('finder.linkUps', { n: e.link_ups }) }}</span>
             <span v-if="!e.still_up" class="badge badge-gray mt-1">{{ t('finder.downAgain') }}</span>
-            <span v-else-if="e.uplink" class="badge badge-indigo mt-1">Uplink</span>
+            <span v-else-if="e.uplink" class="badge badge-brand mt-1">Uplink</span>
           </div>
           <div class="min-w-0 flex-1 text-sm">
             <p v-if="e.still_up && !e.connected.length" class="flex items-center gap-2 text-gray-500 dark:text-gray-400">
               <UiSpinner class="size-4" /> {{ t('finder.noMacYet') }}
             </p>
             <div v-for="c in e.connected" :key="c.mac_address" class="mb-1">
-              <span class="font-medium">{{ c.hostname || c.ip_address || c.vendor || c.mac_address }}</span>
-              <span class="ml-2 font-mono text-xs text-gray-500 dark:text-gray-400">
-                {{ [c.hostname || c.ip_address ? c.mac_address : null, c.ip_address && c.hostname ? c.ip_address : null, c.hostname || c.ip_address ? c.vendor : null].filter(Boolean).join(' · ') || (c.vendor ? c.mac_address : '') }}
-              </span>
+              <span class="font-medium">{{ deviceLabel(c).title }}</span>
+              <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">{{ deviceLabel(c).detail }}</span>
             </div>
             <p v-if="e.mac_count > e.connected.length" class="text-xs text-gray-500">{{ t('switchports.moreDevices', { n: e.mac_count - e.connected.length }) }}</p>
           </div>
@@ -346,13 +345,11 @@ function facts(p: SwitchPort): string[] {
       <p v-for="line in facts(hover.port)" :key="line" class="mt-0.5 text-xs text-gray-600 dark:text-gray-300">{{ line }}</p>
 
       <div v-if="hover.port.neighbor || hover.port.connected.length" class="mt-2 border-t border-gray-100 pt-2 dark:border-white/10">
-        <p class="mb-1 text-[0.6875rem] font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400">{{ t('switchports.connected') }}</p>
-        <p v-if="hover.port.neighbor" class="text-xs"><span class="badge badge-indigo mr-1">LLDP</span>{{ hover.port.neighbor }}</p>
+        <p class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('switchports.connected') }}</p>
+        <p v-if="hover.port.neighbor" class="text-xs"><span class="badge badge-brand mr-1">LLDP</span>{{ hover.port.neighbor }}</p>
         <div v-for="c in hover.port.connected" :key="c.mac_address" class="mt-1 text-xs">
-          <span class="font-medium">{{ c.hostname || c.ip_address || c.vendor || c.mac_address }}</span>
-          <span class="block font-mono text-[0.6875rem] text-gray-500 dark:text-gray-400">
-            {{ [c.hostname || c.ip_address ? c.mac_address : null, c.hostname || c.ip_address ? c.vendor : null, c.hostname ? c.ip_address : null].filter(Boolean).join(' · ') || c.mac_address }}
-          </span>
+          <span class="font-medium">{{ deviceLabel(c).title }}</span>
+          <span class="block text-[0.6875rem] text-gray-500 dark:text-gray-400">{{ deviceLabel(c).detail }}</span>
         </div>
         <p v-if="hover.port.mac_count > hover.port.connected.length" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
           {{ t('switchports.moreDevices', { n: hover.port.mac_count - hover.port.connected.length }) }}

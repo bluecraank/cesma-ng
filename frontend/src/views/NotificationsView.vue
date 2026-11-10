@@ -21,7 +21,7 @@ const icons = { critical: XCircleIcon, warning: ExclamationTriangleIcon, info: I
 const colors = {
   critical: 'text-red-500',
   warning: 'text-yellow-500',
-  info: 'text-indigo-500',
+  info: 'text-brand-500',
 }
 
 async function load(): Promise<void> {
@@ -51,7 +51,7 @@ watch([() => sites.currentId, showAll], load, { immediate: true })
     <div class="flex flex-wrap items-center justify-between gap-4">
       <h1 class="page-title">{{ t('notifications.title') }}</h1>
       <div class="flex items-center gap-4">
-        <label class="flex items-center gap-2 text-sm"><input v-model="showAll" type="checkbox" class="accent-indigo-600" /> {{ t('notifications.showAll') }}</label>
+        <label class="flex items-center gap-2 text-sm"><input v-model="showAll" type="checkbox" class="accent-brand-600" /> {{ t('notifications.showAll') }}</label>
         <button type="button" class="btn btn-secondary" :disabled="!items.some((n) => !n.acknowledged_at)" @click="acknowledgeAll">
           <CheckIcon class="size-4" /> {{ t('notifications.acknowledgeAll') }}
         </button>

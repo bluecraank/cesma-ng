@@ -101,11 +101,11 @@ onMounted(load)
               :key="name"
               type="button"
               class="rounded-md p-2 ring-1"
-              :class="form.icon === name ? 'bg-indigo-50 ring-indigo-500 dark:bg-indigo-500/10' : 'ring-gray-200 hover:bg-gray-50 dark:ring-white/10 dark:hover:bg-white/5'"
+              :class="form.icon === name ? 'bg-brand-50 ring-brand-500 dark:bg-brand-500/10' : 'ring-gray-200 hover:bg-gray-50 dark:ring-white/10 dark:hover:bg-white/5'"
               :title="name"
               @click="form.icon = name"
             >
-              <component :is="icon" class="size-5 text-indigo-500" />
+              <component :is="icon" class="size-5 text-brand-500" />
             </button>
           </div>
         </div>

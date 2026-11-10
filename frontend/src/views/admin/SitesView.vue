@@ -63,7 +63,7 @@ async function remove(name: string, path: string): Promise<void> {
       <section v-for="site in sites.sites" :key="site.id" class="card">
         <header class="flex items-center justify-between gap-3 border-b border-gray-200 px-5 py-3 dark:border-white/10">
           <h2 class="flex items-center gap-2 text-base font-semibold">
-            <MapPinIcon class="size-5 text-indigo-500" /> {{ site.name }}
+            <MapPinIcon class="size-5 text-brand-500" /> {{ site.name }}
           </h2>
           <div v-if="auth.can('devices.manage', site.id)" class="flex items-center gap-1">
             <button type="button" class="btn btn-ghost btn-sm" @click="openDialog(t('sites.newBuilding'), (name) => api.post(`/sites/${site.id}/buildings`, { name }))">

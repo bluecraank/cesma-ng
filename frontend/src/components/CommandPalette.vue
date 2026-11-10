@@ -103,16 +103,16 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey))
             v-for="{ hit, index } in grouped"
             :key="index"
             class="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2"
-            :class="index === selected ? 'bg-indigo-600 text-white' : 'text-gray-900 dark:text-gray-100'"
+            :class="index === selected ? 'bg-brand-600 text-white' : 'text-gray-900 dark:text-gray-100'"
             @mouseenter="selected = index"
             @click="choose(hit)"
           >
             <component :is="icons[hit.kind as keyof typeof icons]" class="size-5 shrink-0" :class="index === selected ? 'text-white' : 'text-gray-400'" />
             <div class="min-w-0 flex-1">
               <p class="truncate text-sm font-medium">{{ hit.title }}</p>
-              <p class="truncate text-xs" :class="index === selected ? 'text-indigo-100' : 'text-gray-500'">{{ hit.subtitle }}</p>
+              <p class="truncate text-xs" :class="index === selected ? 'text-brand-100' : 'text-gray-500'">{{ hit.subtitle }}</p>
             </div>
-            <span class="text-xs" :class="index === selected ? 'text-indigo-100' : 'text-gray-400'">{{ t(`search.kinds.${hit.kind}`) }}</span>
+            <span class="text-xs" :class="index === selected ? 'text-brand-100' : 'text-gray-400'">{{ t(`search.kinds.${hit.kind}`) }}</span>
           </li>
         </ul>
         <p v-else-if="query.trim().length >= 2" class="p-6 text-center text-sm text-gray-500">{{ t('search.empty') }}</p>

@@ -114,10 +114,10 @@ function style(): cytoscape.StylesheetJson {
         'border-color': dark ? '#1f2937' : '#ffffff',
       },
     },
-    { selector: 'node.root', style: { width: 50, height: 50, 'font-size': 15, 'border-color': '#6366f1', 'border-width': 4 } },
+    { selector: 'node.root', style: { width: 50, height: 50, 'font-size': 15, 'border-color': '#2b5fae', 'border-width': 4 } },
     {
       selector: 'node[kind = "external"]',
-      style: { shape: 'ellipse', width: 18, height: 18, 'font-weight': 400, 'font-size': 11, color: muted, 'background-color': '#818cf8' },
+      style: { shape: 'ellipse', width: 18, height: 18, 'font-weight': 400, 'font-size': 11, color: muted, 'background-color': '#92b9e6' },
     },
     {
       selector: 'edge',
@@ -138,9 +138,9 @@ function style(): cytoscape.StylesheetJson {
     },
     { selector: 'edge[!up]', style: { 'line-color': '#ef4444', 'line-style': 'dashed' } },
     { selector: '.faded', style: { opacity: 0.15 } },
-    { selector: 'edge.highlight', style: { 'line-color': '#6366f1', 'min-zoomed-font-size': 0, color: text, 'z-index': 10 } },
+    { selector: 'edge.highlight', style: { 'line-color': '#2b5fae', 'min-zoomed-font-size': 0, color: text, 'z-index': 10 } },
     { selector: 'edge.highlight[!up]', style: { 'line-color': '#ef4444' } },
-    { selector: 'node.highlight', style: { 'border-color': '#6366f1' } },
+    { selector: 'node.highlight', style: { 'border-color': '#2b5fae' } },
   ]
 }
 
@@ -221,7 +221,7 @@ onBeforeUnmount(() => cy?.destroy())
             <option v-for="n in switches" :key="n.id" :value="n.id">{{ n.label }}</option>
           </select>
         </label>
-        <label class="flex items-center gap-2 text-sm"><input v-model="showExternal" type="checkbox" class="accent-indigo-600" /> {{ t('topology.external') }}</label>
+        <label class="flex items-center gap-2 text-sm"><input v-model="showExternal" type="checkbox" class="accent-brand-600" /> {{ t('topology.external') }}</label>
         <button type="button" class="btn btn-secondary" @click="cy?.fit(undefined, 60)"><ArrowsPointingOutIcon class="size-4" /> {{ t('topology.fit') }}</button>
       </div>
     </div>

@@ -52,11 +52,11 @@ const range = computed(() => {
     <p v-if="points.length < 2" class="text-xs text-gray-500">{{ t('stats.noData') }}</p>
     <template v-else>
       <svg :viewBox="`0 0 ${W} ${H}`" class="h-24 w-full max-w-xl" preserveAspectRatio="none" role="img" :aria-label="t('stats.title')">
-        <path :d="path('in_bps')" fill="none" class="stroke-indigo-500" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+        <path :d="path('in_bps')" fill="none" class="stroke-brand-500" stroke-width="1.5" vector-effect="non-scaling-stroke" />
         <path :d="path('out_bps')" fill="none" class="stroke-emerald-500" stroke-width="1.5" vector-effect="non-scaling-stroke" />
       </svg>
       <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-        <span class="flex items-center gap-1"><span class="h-0.5 w-3 bg-indigo-500" /> In {{ rate(last?.in_bps ?? 0) }}</span>
+        <span class="flex items-center gap-1"><span class="h-0.5 w-3 bg-brand-500" /> In {{ rate(last?.in_bps ?? 0) }}</span>
         <span class="flex items-center gap-1"><span class="h-0.5 w-3 bg-emerald-500" /> Out {{ rate(last?.out_bps ?? 0) }}</span>
         <span>{{ t('stats.peak') }} {{ rate(peak) }}</span>
         <span v-if="utilization !== null">{{ t('stats.utilization') }} {{ utilization }} %</span>

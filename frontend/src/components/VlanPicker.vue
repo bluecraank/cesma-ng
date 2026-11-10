@@ -83,12 +83,12 @@ function onKey(event: KeyboardEvent): void {
       <span
         v-for="vid in model"
         :key="vid"
-        class="inline-flex items-center gap-1 rounded-md bg-indigo-50 py-0.5 pr-1 pl-2 text-xs text-indigo-700 ring-1 ring-indigo-600/20 dark:bg-indigo-500/10 dark:text-indigo-300"
+        class="inline-flex items-center gap-1 rounded-md bg-brand-50 py-0.5 pr-1 pl-2 text-xs text-brand-700 ring-1 ring-brand-600/20 dark:bg-brand-500/10 dark:text-brand-300"
       >
         <span class="font-mono font-semibold">{{ vid }}</span>
         <span v-if="nameOf(vid)" class="max-w-32 truncate">{{ nameOf(vid) }}</span>
         <span v-else class="text-yellow-600 dark:text-yellow-400" :title="t('vlanPicker.unknownHint')">?</span>
-        <button type="button" class="rounded p-0.5 hover:bg-indigo-100 dark:hover:bg-white/10" :aria-label="t('common.delete')" @click.stop="remove(vid)">
+        <button type="button" class="rounded p-0.5 hover:bg-brand-100 dark:hover:bg-white/10" :aria-label="t('common.delete')" @click.stop="remove(vid)">
           <XMarkIcon class="size-3" />
         </button>
       </span>
@@ -113,7 +113,7 @@ function onKey(event: KeyboardEvent): void {
         v-for="(v, i) in suggestions"
         :key="v.vid"
         class="flex cursor-pointer gap-3 px-3 py-1.5"
-        :class="i === active ? 'bg-indigo-600 text-white' : 'hover:bg-gray-50 dark:hover:bg-white/5'"
+        :class="i === active ? 'bg-brand-600 text-white' : 'hover:bg-gray-50 dark:hover:bg-white/5'"
         @mousedown.prevent="add([v.vid])"
         @mouseenter="active = i"
       >

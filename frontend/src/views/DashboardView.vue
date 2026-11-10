@@ -47,16 +47,21 @@ watch(() => sites.currentId, load, { immediate: true })
       <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ sites.current?.name }}</p>
     </div>
 
-    <dl class="grid grid-cols-2 gap-4 lg:grid-cols-5">
-      <div class="card px-5 py-4">
-        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.devices') }}</dt>
-        <dd class="mt-1 text-3xl font-semibold tracking-tight">{{ devices.length }}</dd>
-      </div>
-      <div v-for="c in counts" :key="c.status" class="card px-5 py-4">
-        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ t(`dashboard.${c.status}`) }}</dt>
-        <dd class="mt-1 text-3xl font-semibold tracking-tight" :class="c.count ? c.color : ''">{{ c.count }}</dd>
-      </div>
-    </dl>
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <RouterLink :to="{ name: 'devices' }" class="card px-5 py-4 transition hover:ring-gray-300 dark:hover:ring-white/20">
+        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.devices') }}</p>
+        <p class="mt-1 text-2xl font-semibold tabular-nums">{{ devices.length }}</p>
+      </RouterLink>
+      <RouterLink
+        v-for="c in counts"
+        :key="c.status"
+        :to="{ name: 'devices', query: { status: c.status } }"
+        class="card px-5 py-4 transition hover:ring-gray-300 dark:hover:ring-white/20"
+      >
+        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t(`dashboard.${c.status}`) }}</p>
+        <p class="mt-1 text-2xl font-semibold tabular-nums" :class="c.count ? c.color : ''">{{ c.count }}</p>
+      </RouterLink>
+    </div>
 
     <div class="grid gap-6 xl:grid-cols-2">
       <section v-if="problems.length" class="card">

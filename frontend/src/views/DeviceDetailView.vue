@@ -18,6 +18,7 @@ import { useNotify } from '@/composables/useNotify'
 import { useAuthStore } from '@/stores/auth'
 import { useSitesStore } from '@/stores/sites'
 import { formatDateTime, formatUptime } from '@/utils/format'
+import UiMenu from '@/components/ui/UiMenu.vue'
 
 type Tab = 'ports' | 'vlans' | 'fdb' | 'lldp' | 'backups' | 'console' | 'poll' | 'details'
 const ALL_TABS: Tab[] = ['ports', 'vlans', 'fdb', 'lldp', 'backups', 'console', 'poll', 'details']
@@ -183,20 +184,23 @@ watch(() => props.id, load, { immediate: true })
         <button type="button" class="btn btn-secondary" :disabled="refreshing" @click="refresh">
           <ArrowPathIcon class="size-4" :class="{ 'animate-spin': refreshing }" /> {{ t('poll.refresh') }}
         </button>
-        <button v-if="canPushKeys" type="button" class="btn btn-secondary" @click="pushKeys">
-          <KeyIcon class="size-4" /> {{ t('sshKeys.pushOne') }}
+        <button v-if="canManage" type="button" class="btn btn-secondary" @click="editOpen = true">
+          <PencilSquareIcon class="size-4" /> {{ t('common.edit') }}
         </button>
-        <template v-if="canManage">
-          <button type="button" class="btn btn-secondary" @click="renameOpen = true">
+        <UiMenu v-if="canPushKeys || canManage" :label="t('common.more')">
+          <button v-if="canPushKeys" type="button" role="menuitem" class="menu-item" @click="pushKeys">
+            <KeyIcon class="size-4" /> {{ t('sshKeys.pushOne') }}
+          </button>
+          <button v-if="canManage" type="button" role="menuitem" class="menu-item" @click="renameOpen = true">
             <TagIcon class="size-4" /> {{ t('rename.title') }}
           </button>
-          <button type="button" class="btn btn-secondary" @click="editOpen = true">
-            <PencilSquareIcon class="size-4" /> {{ t('common.edit') }}
-          </button>
-          <button type="button" class="btn btn-secondary text-red-600 dark:text-red-400" @click="remove">
-            <TrashIcon class="size-4" /> {{ t('common.delete') }}
-          </button>
-        </template>
+          <template v-if="canManage">
+            <div class="my-1 border-t border-gray-100 dark:border-white/10" />
+            <button type="button" role="menuitem" class="menu-item text-red-600 dark:text-red-400" @click="remove">
+              <TrashIcon class="size-4" /> {{ t('common.delete') }}
+            </button>
+          </template>
+        </UiMenu>
       </div>
     </div>
 
@@ -210,7 +214,7 @@ watch(() => props.id, load, { immediate: true })
         class="border-b-2 px-1 py-3 text-sm font-medium whitespace-nowrap"
         :class="
           tab === name
-            ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+            ? 'border-brand-500 text-brand-600 dark:text-brand-400'
             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
         "
         @click="tab = name"

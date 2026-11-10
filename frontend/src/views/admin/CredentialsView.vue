@@ -140,7 +140,7 @@ onMounted(load)
               :key="v"
               type="button"
               class="px-3 py-1.5 text-sm font-semibold ring-1 ring-gray-300 ring-inset first:rounded-l-md last:rounded-r-md dark:ring-white/10"
-              :class="form.snmp_version === v ? 'bg-indigo-600 text-white ring-indigo-600' : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-white/5 dark:text-white'"
+              :class="form.snmp_version === v ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-white/5 dark:text-white'"
               @click="form.snmp_version = v"
             >
               {{ v }}

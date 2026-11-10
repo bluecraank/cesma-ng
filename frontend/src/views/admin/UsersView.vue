@@ -81,7 +81,7 @@ onMounted(load)
               <span v-if="u.has_local_password" class="badge badge-yellow mt-1" :title="t('users.emergencyHint')">{{ t('users.emergency') }}</span>
             </td>
             <td>
-              <span v-if="u.is_superadmin" class="badge badge-indigo">{{ t('users.superadmin') }}</span>
+              <span v-if="u.is_superadmin" class="badge badge-brand">{{ t('users.superadmin') }}</span>
               <div v-else class="flex flex-wrap gap-1">
                 <span v-for="r in u.site_roles" :key="r.site_id" class="badge" :class="r.permissions.length ? 'badge-blue' : 'badge-gray'">
                   {{ siteName(r.site_id) }}: {{ r.role_name }}
@@ -130,7 +130,7 @@ onMounted(load)
             :placeholder="editing?.has_local_password ? t('users.emergencyKeep') : t('users.emergencyNew')"
           />
           <label v-if="editing?.has_local_password" class="flex items-center gap-2 text-sm">
-            <input v-model="form.clearPassword" type="checkbox" class="accent-indigo-600" :disabled="!!form.password" /> {{ t('users.emergencyRemove') }}
+            <input v-model="form.clearPassword" type="checkbox" class="accent-brand-600" :disabled="!!form.password" /> {{ t('users.emergencyRemove') }}
           </label>
         </div>
       </form>

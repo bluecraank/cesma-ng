@@ -2,6 +2,7 @@
 import { CheckIcon, ChevronUpDownIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, PlusIcon, SignalIcon, XMarkIcon } from '@heroicons/vue/20/solid'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { api, type Device, type DeviceHint } from '@/api/client'
 import DeviceFormDialog from '@/components/DeviceFormDialog.vue'
 import DiscoverDialog from '@/components/DiscoverDialog.vue'
@@ -26,6 +27,12 @@ const hintsOf = (id: number): DeviceHint[] => hints.value.filter((h) => h.device
 const devicesWithHints = computed(() => new Set(hints.value.map((h) => h.device_id)).size)
 const loading = ref(false)
 const search = ref('')
+// status filter, also set from the dashboard (?status=offline)
+const route = useRoute()
+const router = useRouter()
+const STATUS_FILTERS = ['online', 'offline', 'unknown', 'unconfirmed'] as const
+const statusFilter = ref(typeof route.query.status === 'string' ? route.query.status : '')
+watch(statusFilter, (status) => void router.replace({ query: { ...route.query, status: status || undefined } }))
 const dialogOpen = ref(false)
 const discoverOpen = ref(false)
 const confirmDelete = useConfirmDelete()
@@ -84,11 +91,11 @@ function sortBy(key: SortKey): void {
 
 const rows = computed(() => {
   const q = search.value.trim().toLowerCase()
-  const filtered = q
-    ? devices.value.filter((d) =>
-        [d.name, d.hostname, d.ip_address, d.dns_name, d.model_name, d.serial_number, d.firmware].some((v) => v?.toLowerCase().includes(q)),
-      )
-    : devices.value
+  const filtered = devices.value.filter(
+    (d) =>
+      (!statusFilter.value || d.status === statusFilter.value) &&
+      (!q || [d.name, d.hostname, d.ip_address, d.dns_name, d.model_name, d.serial_number, d.firmware].some((v) => v?.toLowerCase().includes(q))),
+  )
   const dir = sortAsc.value ? 1 : -1
   const value = (d: Device): string =>
     sortKey.value === 'ip_address' ? ipSortKey(d.ip_address) : String(d[sortKey.value] ?? '')
@@ -110,6 +117,10 @@ watch(() => sites.currentId, load, { immediate: true })
           <MagnifyingGlassIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-gray-400" />
           <input v-model="search" class="input w-64 pl-8" :placeholder="t('common.search')" />
         </div>
+        <select v-model="statusFilter" class="input w-40" :aria-label="t('device.status')">
+          <option value="">{{ t('device.allStatuses') }}</option>
+          <option v-for="s in STATUS_FILTERS" :key="s" :value="s">{{ t(`device.statuses.${s}`) }}</option>
+        </select>
         <button v-if="canCreate" type="button" class="btn btn-secondary" @click="discoverOpen = true">
           <SignalIcon class="size-4" /> {{ t('discover.title') }}
         </button>
@@ -120,11 +131,11 @@ watch(() => sites.currentId, load, { immediate: true })
     </div>
 
     <p v-if="devicesWithHints" class="flex items-center gap-2 text-sm text-yellow-700 dark:text-yellow-400">
-      <ExclamationTriangleIcon class="size-4" /> {{ t('hints.summary', { n: devicesWithHints }) }}
+      <ExclamationTriangleIcon class="size-4" /> {{ t('hints.summary', devicesWithHints) }}
     </p>
 
     <div v-if="unconfirmed.length" class="rounded-xl bg-yellow-50 p-4 ring-1 ring-yellow-600/20 dark:bg-yellow-500/10 dark:ring-yellow-500/20">
-      <p class="text-sm font-semibold text-yellow-800 dark:text-yellow-300">{{ t('discover.waiting', { n: unconfirmed.length }) }}</p>
+      <p class="text-sm font-semibold text-yellow-800 dark:text-yellow-300">{{ t('discover.waiting', unconfirmed.length) }}</p>
       <ul class="mt-2 space-y-1.5">
         <li v-for="d in unconfirmed" :key="d.id" class="flex flex-wrap items-center gap-3 text-sm">
           <span class="font-medium">{{ d.name }}</span>
@@ -144,9 +155,9 @@ watch(() => sites.currentId, load, { immediate: true })
           <tr>
             <th class="w-12"><span class="sr-only">{{ t('device.model') }}</span></th>
             <th v-for="col in columns" :key="col.key">
-              <button type="button" class="inline-flex items-center gap-1 uppercase hover:text-gray-900 dark:hover:text-white" @click="sortBy(col.key)">
+              <button type="button" class="inline-flex items-center gap-1 hover:text-gray-900 dark:hover:text-white" @click="sortBy(col.key)">
                 {{ col.label }}
-                <ChevronUpDownIcon class="size-4" :class="sortKey === col.key ? 'text-indigo-500' : 'opacity-40'" />
+                <ChevronUpDownIcon class="size-4" :class="sortKey === col.key ? 'text-brand-500' : 'opacity-40'" />
               </button>
             </th>
           </tr>
@@ -170,8 +181,8 @@ watch(() => sites.currentId, load, { immediate: true })
                 <ExclamationTriangleIcon class="size-4" />
               </RouterLink>
             </td>
-            <td class="font-mono text-xs whitespace-nowrap">{{ d.ip_address ?? '—' }}</td>
-            <td class="max-w-56 truncate font-mono text-xs" :title="d.dns_name ?? ''">{{ d.dns_name ?? '—' }}</td>
+            <td class="whitespace-nowrap"><span v-if="d.ip_address">{{ d.ip_address }}</span><span v-else class="muted">—</span></td>
+            <td class="max-w-56 truncate" :title="d.dns_name ?? ''"><span v-if="d.dns_name">{{ d.dns_name }}</span><span v-else class="muted">—</span></td>
             <td>{{ d.model_name || t(`device.models.${d.model}`) }}</td>
             <td>{{ d.firmware || '—' }}</td>
             <td><DeviceStatusTag :status="d.status" /></td>

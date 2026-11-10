@@ -5,7 +5,21 @@
 
 @theme {
   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  /* Consolas before Cascadia: no slashed zero, calmer for MACs and port names */
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Cascadia Mono', monospace;
+
+  /* Accent colour: a calm steel blue (used for buttons, links, focus, selection) */
+  --color-brand-50: #eff5fc;
+  --color-brand-100: #dbe8f8;
+  --color-brand-200: #bed5f1;
+  --color-brand-300: #92b9e6;
+  --color-brand-400: #6096d8;
+  --color-brand-500: #3d77c9;
+  --color-brand-600: #2b5fae;
+  --color-brand-700: #254d8d;
+  --color-brand-800: #234274;
+  --color-brand-900: #213961;
+  --color-brand-950: #172440;
 }
 
 @layer base {
@@ -31,14 +45,14 @@
 /* Small set of primitives in the style of Tailwind UI. Behaviour lives in Vue components. */
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold shadow-xs transition
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium shadow-xs transition
       focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-sm {
-    @apply px-2.5 py-1.5 text-xs;
+    @apply px-2.5 py-1 text-xs;
   }
   .btn-primary {
-    @apply bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-indigo-600 dark:bg-indigo-500 dark:hover:bg-indigo-400;
+    @apply bg-brand-600 text-white hover:bg-brand-500 focus-visible:outline-brand-600 dark:bg-brand-500 dark:hover:bg-brand-400;
   }
   .btn-secondary {
     @apply bg-white text-gray-900 ring-1 ring-gray-300 ring-inset hover:bg-gray-50
@@ -58,8 +72,8 @@
 
   .input {
     @apply block w-full rounded-md bg-white px-3 py-1.5 text-sm text-gray-900 outline-1 -outline-offset-1 outline-gray-300
-      placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600
-      dark:bg-white/5 dark:text-white dark:outline-white/10 dark:placeholder:text-gray-500 dark:focus:outline-indigo-500;
+      placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-brand-600
+      dark:bg-white/5 dark:text-white dark:outline-white/10 dark:placeholder:text-gray-500 dark:focus:outline-brand-500;
   }
   select.input {
     @apply pr-8;
@@ -76,7 +90,7 @@
   }
 
   .card {
-    @apply rounded-xl bg-white shadow-xs ring-1 ring-gray-900/5 dark:bg-gray-900 dark:ring-white/10;
+    @apply rounded-lg bg-white ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-white/10;
   }
 
   .badge {
@@ -94,8 +108,8 @@
   .badge-yellow {
     @apply bg-yellow-50 text-yellow-800 ring-yellow-600/20 dark:bg-yellow-400/10 dark:text-yellow-500 dark:ring-yellow-400/20;
   }
-  .badge-indigo {
-    @apply bg-indigo-50 text-indigo-700 ring-indigo-700/10 dark:bg-indigo-400/10 dark:text-indigo-400 dark:ring-indigo-400/30;
+  .badge-brand {
+    @apply bg-brand-50 text-brand-700 ring-brand-700/10 dark:bg-brand-400/10 dark:text-brand-400 dark:ring-brand-400/30;
   }
   .badge-blue {
     @apply bg-blue-50 text-blue-700 ring-blue-700/10 dark:bg-blue-400/10 dark:text-blue-400 dark:ring-blue-400/30;
@@ -113,10 +127,10 @@
     @apply sticky top-0 z-[5] bg-white shadow-[inset_0_-1px_0] shadow-gray-200 dark:bg-gray-900 dark:shadow-white/10;
   }
   .table th {
-    @apply px-3 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap text-gray-500 uppercase dark:text-gray-400;
+    @apply px-3 py-2.5 text-left text-xs font-medium whitespace-nowrap text-gray-500 dark:text-gray-400;
   }
   .table td {
-    @apply px-3 py-2.5 align-top text-gray-700 dark:text-gray-300;
+    @apply px-3 py-2 align-middle text-gray-700 tabular-nums dark:text-gray-300;
   }
   .table tbody {
     @apply divide-y divide-gray-100 dark:divide-white/5;
@@ -150,10 +164,19 @@
     }
   }
 
+  .menu-item {
+    @apply flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm whitespace-nowrap text-gray-700 hover:bg-gray-50
+      dark:text-gray-200 dark:hover:bg-white/5;
+  }
+
   .page-title {
-    @apply text-2xl font-semibold tracking-tight text-gray-900 dark:text-white;
+    @apply text-xl font-semibold text-gray-900 dark:text-white;
+  }
+  /* placeholder for empty values in tables */
+  .muted {
+    @apply text-gray-400 dark:text-gray-600;
   }
   .link {
-    @apply font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300;
+    @apply font-medium text-brand-600 hover:text-brand-500 dark:text-brand-400 dark:hover:text-brand-300;
   }
 }

@@ -78,7 +78,7 @@ async function removeVlan(v: SiteVlan): Promise<void> {
 async function importVlans(): Promise<void> {
   await notify.run(async () => {
     const result = await api.post<{ imported: number }>(`${base.value}/vlans/import`)
-    notify.success(t('siteVlans.imported', { n: result.imported }))
+    notify.success(t('siteVlans.imported', result.imported))
     await load()
   })
 }
@@ -174,7 +174,7 @@ async function removeProfile(p: PortProfile): Promise<void> {
       <UiSpinner />
       <div class="flex-1">
         <p class="text-sm font-medium">{{ t('jobs.kinds.vlan_sync') }} · {{ t(`jobs.statuses.${job.status}`) }}</p>
-        <div class="mt-2 h-1.5 rounded-full bg-gray-100 dark:bg-white/10"><div class="h-1.5 rounded-full bg-indigo-500 transition-all" :style="{ width: `${job.progress}%` }" /></div>
+        <div class="mt-2 h-1.5 rounded-full bg-gray-100 dark:bg-white/10"><div class="h-1.5 rounded-full bg-brand-500 transition-all" :style="{ width: `${job.progress}%` }" /></div>
       </div>
     </div>
 
@@ -184,7 +184,7 @@ async function removeProfile(p: PortProfile): Promise<void> {
         :key="name"
         type="button"
         class="border-b-2 px-1 py-3 text-sm font-medium"
-        :class="tab === name ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'"
+        :class="tab === name ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'"
         @click="tab = name"
       >
         {{ name === 'vlans' ? `${t('siteVlans.title')} (${vlans.length})` : `${t('siteVlans.profiles')} (${profiles.length})` }}
@@ -205,12 +205,12 @@ async function removeProfile(p: PortProfile): Promise<void> {
         </thead>
         <tbody>
           <tr v-for="v in vlans" :key="v.id">
-            <td class="font-mono font-medium">{{ v.vid }}</td>
+            <td class="font-medium">{{ v.vid }}</td>
             <td>
               <div class="font-medium text-gray-900 dark:text-white">{{ v.name }}</div>
               <div v-if="v.description" class="text-xs text-gray-500">{{ v.description }}</div>
             </td>
-            <td class="font-mono text-xs">{{ v.ip_range ?? '' }}</td>
+            <td class="text-gray-500">{{ v.ip_range ?? '' }}</td>
             <td class="whitespace-nowrap">
               <span class="badge" :class="v.devices_with_vlan === v.device_count ? 'badge-green' : 'badge-yellow'">{{ v.devices_with_vlan }} / {{ v.device_count }}</span>
               <span v-if="v.devices_name_mismatch" class="badge badge-yellow ml-1">{{ t('siteVlans.mismatch', { n: v.devices_name_mismatch }) }}</span>
@@ -244,10 +244,10 @@ async function removeProfile(p: PortProfile): Promise<void> {
         <tbody>
           <tr v-for="p in profiles" :key="p.id">
             <td class="font-medium text-gray-900 dark:text-white">{{ p.name }}</td>
-            <td class="whitespace-nowrap"><span class="font-mono">{{ p.untagged_vid ?? '–' }}</span> <span class="text-xs text-gray-500">{{ p.untagged_vid ? vlanName(p.untagged_vid) : '' }}</span></td>
+            <td class="whitespace-nowrap"><span class="font-medium">{{ p.untagged_vid ?? '–' }}</span> <span class="text-xs text-gray-500">{{ p.untagged_vid ? vlanName(p.untagged_vid) : '' }}</span></td>
             <td class="text-xs">
               <span v-for="vid in p.tagged_vids" :key="vid" class="mr-2 inline-block whitespace-nowrap">
-                <span class="font-mono font-medium">{{ vid }}</span> <span class="text-gray-500">{{ vlanName(vid) }}</span>
+                <span class="font-medium">{{ vid }}</span> <span class="text-gray-500">{{ vlanName(vid) }}</span>
               </span>
             </td>
             <td>{{ p.description ?? '' }}</td>

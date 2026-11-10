@@ -32,7 +32,7 @@ const busy = ref(false)
 
 const single = computed(() => (props.ports.length === 1 ? props.ports[0] : null))
 const title = computed(() =>
-  single.value ? `${t('ports.port')} ${single.value.name}` : t('change.editPorts', { n: props.ports.length }),
+  single.value ? `${t('ports.port')} ${single.value.name}` : t('change.editPorts', props.ports.length),
 )
 
 function memberOf(port: Port, vid: number): Member {
@@ -156,7 +156,7 @@ async function apply(): Promise<void> {
 const choiceClass: Record<(typeof CHOICES)[number], string> = {
   none: 'bg-gray-600 text-white ring-gray-600 dark:bg-gray-500',
   untagged: 'bg-emerald-600 text-white ring-emerald-600',
-  tagged: 'bg-indigo-600 text-white ring-indigo-600',
+  tagged: 'bg-brand-600 text-white ring-brand-600',
 }
 </script>
 
@@ -191,7 +191,7 @@ const choiceClass: Record<(typeof CHOICES)[number], string> = {
               <span class="badge badge-green">U</span> {{ untaggedLabel }}
             </span>
             <span class="text-sm">
-              <span class="badge badge-indigo">T</span> {{ taggedNow.length ? taggedNow.map((v) => v.vid).join(', ') : '—' }}
+              <span class="badge badge-brand">T</span> {{ taggedNow.length ? taggedNow.map((v) => v.vid).join(', ') : '—' }}
             </span>
             <span v-if="changedCount" class="badge badge-yellow">{{ t('change.changedCount', { n: changedCount }) }}</span>
           </div>
@@ -202,7 +202,7 @@ const choiceClass: Record<(typeof CHOICES)[number], string> = {
               <MagnifyingGlassIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-gray-400" />
               <input v-model="filter" class="input w-56 pl-8" :placeholder="t('change.vlanFilter')" />
             </div>
-            <label class="flex items-center gap-2 text-sm"><input v-model="onlyAssigned" type="checkbox" class="accent-indigo-600" /> {{ t('change.onlyAssigned') }}</label>
+            <label class="flex items-center gap-2 text-sm"><input v-model="onlyAssigned" type="checkbox" class="accent-brand-600" /> {{ t('change.onlyAssigned') }}</label>
           </div>
 
           <ul class="max-h-80 divide-y divide-gray-100 overflow-y-auto rounded-lg border border-gray-200 dark:divide-white/5 dark:border-white/10">
@@ -250,7 +250,7 @@ const choiceClass: Record<(typeof CHOICES)[number], string> = {
             :key="option"
             type="button"
             class="px-3 py-1.5 text-sm font-medium ring-1 ring-gray-300 ring-inset first:rounded-l-md last:rounded-r-md dark:ring-white/10"
-            :class="enabled === option ? 'bg-indigo-600 text-white ring-indigo-600' : 'bg-white hover:bg-gray-50 dark:bg-white/5'"
+            :class="enabled === option ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white hover:bg-gray-50 dark:bg-white/5'"
             @click="enabled = option"
           >
             {{ option === 'keep' ? t('change.unchanged') : option === 'on' ? t('change.enabled') : t('change.disabled') }}

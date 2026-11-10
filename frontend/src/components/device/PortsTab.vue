@@ -7,6 +7,7 @@ import PortEditDialog from './PortEditDialog.vue'
 import TrafficChart from './TrafficChart.vue'
 import type { components } from '@/api/schema'
 import { formatDateTime } from '@/utils/format'
+import { shortVendor } from '@/utils/vendor'
 
 const props = defineProps<{
   deviceId: number
@@ -130,7 +131,7 @@ const EVENT_STYLE: Record<string, string> = {
   link_up: 'bg-green-500',
   link_down: 'bg-gray-400',
   speed: 'bg-amber-500',
-  configured: 'bg-indigo-500',
+  configured: 'bg-brand-500',
   changed: 'bg-orange-500',
 }
 
@@ -153,24 +154,24 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
         <MagnifyingGlassIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-gray-400" />
         <input v-model="search" class="input w-64 pl-8" :placeholder="t('common.search')" />
       </div>
-      <label class="flex items-center gap-2 text-sm"><input v-model="onlyUp" type="checkbox" class="rounded accent-indigo-600" /> {{ t('ports.onlyUp') }}</label>
-      <label class="flex items-center gap-2 text-sm"><input v-model="onlyUplinks" type="checkbox" class="rounded accent-indigo-600" /> {{ t('ports.onlyUplinks') }}</label>
+      <label class="flex items-center gap-2 text-sm"><input v-model="onlyUp" type="checkbox" class="rounded accent-brand-600" /> {{ t('ports.onlyUp') }}</label>
+      <label class="flex items-center gap-2 text-sm"><input v-model="onlyUplinks" type="checkbox" class="rounded accent-brand-600" /> {{ t('ports.onlyUplinks') }}</label>
       <span class="ml-auto text-sm text-gray-500 dark:text-gray-400">{{ rows.length }} / {{ ports.length }}</span>
     </div>
 
     <!-- Selection bar: stays visible while scrolling through long port lists -->
     <div
       v-if="canEdit && selected.size"
-      class="sticky top-16 z-10 flex flex-wrap items-center gap-3 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm text-white shadow-lg"
+      class="sticky top-16 z-10 flex flex-wrap items-center gap-3 rounded-lg bg-brand-600 px-4 py-2.5 text-sm text-white shadow-lg"
     >
-      <span class="font-medium">{{ t('change.selected', { n: selected.size }) }}</span>
-      <span class="truncate font-mono text-xs text-indigo-100">{{ selectedPorts.map((p) => p.name).join(', ') }}</span>
-      <span class="hidden text-xs text-indigo-200 lg:inline">{{ t('change.shiftHint') }}</span>
+      <span class="font-medium">{{ t('change.selected', selected.size) }}</span>
+      <span class="truncate font-mono text-xs text-brand-100">{{ selectedPorts.map((p) => p.name).join(', ') }}</span>
+      <span class="hidden text-xs text-brand-200 lg:inline">{{ t('change.shiftHint') }}</span>
       <div class="ml-auto flex gap-2">
-        <button type="button" class="btn btn-sm bg-white text-indigo-700 hover:bg-indigo-50" @click="edit(selectedPorts)">
-          <PencilSquareIcon class="size-4" /> {{ t('change.editPorts', { n: selected.size }) }}
+        <button type="button" class="btn btn-sm bg-white text-brand-700 hover:bg-brand-50" @click="edit(selectedPorts)">
+          <PencilSquareIcon class="size-4" /> {{ t('change.editPorts', selected.size) }}
         </button>
-        <button type="button" class="rounded-md p-1.5 text-indigo-100 hover:bg-white/10" :title="t('change.clearSelection')" @click="selected = new Set()">
+        <button type="button" class="rounded-md p-1.5 text-brand-100 hover:bg-white/10" :title="t('change.clearSelection')" @click="selected = new Set()">
           <XMarkIcon class="size-4" />
         </button>
       </div>
@@ -183,7 +184,7 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
         <thead>
           <tr>
             <th v-if="canEdit" class="w-6">
-              <input type="checkbox" class="accent-indigo-600" :title="t('change.selectAll')" :checked="selected.size > 0 && selected.size === rows.length" @change="toggleAll" />
+              <input type="checkbox" class="accent-brand-600" :title="t('change.selectAll')" :checked="selected.size > 0 && selected.size === rows.length" @change="toggleAll" />
             </th>
             <th class="w-6" />
             <th>{{ t('ports.port') }}</th>
@@ -204,21 +205,21 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
               :id="`port-${p.id}`"
               class="cursor-pointer scroll-mt-32"
               :class="{
-                'bg-indigo-50/50 dark:bg-indigo-500/5': selected.has(p.id),
+                'bg-brand-50/50 dark:bg-brand-500/5': selected.has(p.id),
                 'outline-2 -outline-offset-2 outline-amber-400 bg-amber-50 dark:bg-amber-400/10': highlighted === p.id,
               }"
               @click="toggle(p)"
             >
               <td v-if="canEdit" class="select-none" @click.stop="toggleSelect(p.id, $event)">
-                <input type="checkbox" class="pointer-events-none accent-indigo-600" :checked="selected.has(p.id)" tabindex="-1" />
+                <input type="checkbox" class="pointer-events-none accent-brand-600" :checked="selected.has(p.id)" tabindex="-1" />
               </td>
               <td class="text-gray-400">
                 <ChevronDownIcon v-if="expanded === p.id" class="size-4" />
                 <ChevronRightIcon v-else class="size-4" />
               </td>
-              <td class="font-mono font-medium whitespace-nowrap text-gray-900 dark:text-white">
+              <td class="font-medium whitespace-nowrap text-gray-900 dark:text-white">
                 {{ p.name }}
-                <span v-if="p.kind === 'lag'" class="badge badge-indigo ml-1 font-sans">{{ t('ports.lag') }}</span>
+                <span v-if="p.kind === 'lag'" class="badge badge-brand ml-1 font-sans">{{ t('ports.lag') }}</span>
                 <span v-else-if="p.is_uplink" class="badge badge-blue ml-1 font-sans">{{ t('ports.uplink') }}</span>
               </td>
               <td class="whitespace-nowrap">
@@ -227,10 +228,10 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
                 <span v-else class="badge badge-gray">{{ t('ports.down') }}</span>
               </td>
               <td class="max-w-56 truncate" :title="p.description">{{ p.description }}</td>
-              <td class="font-mono text-xs whitespace-nowrap">
+              <td class="whitespace-nowrap">
                 {{ p.untagged_vlans.join(', ') }}
               </td>
-              <td class="font-mono text-xs" :title="p.tagged_vlans.join(', ')">{{ vlanList(p.tagged_vlans) }}</td>
+              <td class="text-gray-500" :title="p.tagged_vlans.join(', ')">{{ vlanList(p.tagged_vlans) }}</td>
               <td>
                 <span v-if="p.poe" class="badge" :class="poeBadge[p.poe]">
                   <BoltIcon v-if="p.poe === 'delivering'" class="size-3" />{{ t(`ports.poeStates.${p.poe}`) }}
@@ -262,12 +263,12 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
                   <tr v-for="m in macs" :key="`${m.vid}-${m.mac_address}`">
                     <td class="py-0.5 pr-6 font-mono">{{ m.mac_address }}</td>
                     <td class="py-0.5 pr-6">VLAN {{ m.vid ?? '?' }}</td>
-                    <td class="py-0.5 font-mono">{{ m.ip_addresses.join(', ') }}</td>
+                    <td class="py-0.5">{{ m.ip_addresses.join(', ') }}</td>
                   </tr>
                 </table>
                 <div v-if="history" class="mt-4 grid gap-6 lg:grid-cols-2">
                   <div>
-                    <p class="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">{{ t('history.events') }}</p>
+                    <p class="mb-2 text-xs font-medium text-gray-500">{{ t('history.events') }}</p>
                     <ol v-if="history.events.length" class="max-h-64 space-y-1.5 overflow-y-auto pr-2 text-xs">
                       <li v-for="(e, i) in history.events" :key="i" class="flex gap-2">
                         <span class="mt-1 size-2 shrink-0 rounded-full" :class="EVENT_STYLE[e.kind] ?? 'bg-gray-400'" />
@@ -283,13 +284,13 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
                     <p v-else class="text-xs text-gray-500">{{ t('history.noEvents') }}</p>
                   </div>
                   <div>
-                    <p class="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">{{ t('history.devices') }}</p>
+                    <p class="mb-2 text-xs font-medium text-gray-500">{{ t('history.devices') }}</p>
                     <table v-if="history.devices.length" class="w-full text-xs">
                       <tr v-for="d in history.devices" :key="d.mac_address" class="align-top">
                         <td class="py-0.5 pr-3 font-mono">{{ d.mac_address }}</td>
                         <td class="py-0.5 pr-3">
                           {{ d.hostname || d.ip_address || '' }}
-                          <span v-if="d.vendor" class="block text-gray-500">{{ d.vendor }}</span>
+                          <span v-if="d.vendor" class="block text-gray-500" :title="d.vendor">{{ shortVendor(d.vendor) }}</span>
                         </td>
                         <td class="py-0.5 text-right whitespace-nowrap text-gray-500 tabular-nums">
                           {{ formatDateTime(d.first_seen_at, locale) }} – {{ formatDateTime(d.last_seen_at, locale) }}

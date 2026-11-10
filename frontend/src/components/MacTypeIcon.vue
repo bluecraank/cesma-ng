@@ -7,6 +7,6 @@ const component = computed(() => (props.icon ? MAC_TYPE_ICONS[props.icon as MacT
 </script>
 
 <template>
-  <component :is="component" v-if="component" class="size-4 shrink-0 text-indigo-500" />
+  <component :is="component" v-if="component" class="size-4 shrink-0 text-brand-500" />
   <span v-else class="size-4 shrink-0" />
 </template>

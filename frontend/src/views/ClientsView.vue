@@ -7,6 +7,7 @@ import { api, type ClientPage, type ClientRow } from '@/api/client'
 import MacTypeIcon from '@/components/MacTypeIcon.vue'
 import { useNotify } from '@/composables/useNotify'
 import { useSitesStore } from '@/stores/sites'
+import { shortVendor } from '@/utils/vendor'
 import { formatDateTime } from '@/utils/format'
 
 const PAGE_SIZE = 100
@@ -79,7 +80,7 @@ watch(
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('clients.hint') }}</p>
       </div>
       <div class="flex flex-wrap items-center gap-4">
-        <label class="flex items-center gap-2 text-sm"><input v-model="activeOnly" type="checkbox" class="accent-indigo-600" /> {{ t('clients.activeOnly') }}</label>
+        <label class="flex items-center gap-2 text-sm"><input v-model="activeOnly" type="checkbox" class="accent-brand-600" /> {{ t('clients.activeOnly') }}</label>
         <div class="relative">
           <MagnifyingGlassIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-gray-400" />
           <input v-model="query" class="input w-80 pl-8" :placeholder="t('common.search')" autofocus />
@@ -106,12 +107,13 @@ watch(
               <td class="whitespace-nowrap">
                 <span class="inline-flex items-center gap-2">
                   <MacTypeIcon :icon="c.type_icon" :title="c.type_name ?? ''" />
-                  <span class="font-medium text-gray-900 dark:text-white">{{ c.hostname || '—' }}</span>
+                  <span v-if="c.hostname" class="font-medium text-gray-900 dark:text-white">{{ c.hostname }}</span>
+                  <span v-else class="muted">—</span>
                 </span>
               </td>
-              <td class="font-mono text-xs">{{ c.ip_address ?? '' }}</td>
+              <td class="tabular-nums">{{ c.ip_address ?? '' }}</td>
               <td class="font-mono text-xs whitespace-nowrap">{{ c.mac_address }}</td>
-              <td class="max-w-48 truncate text-xs" :title="c.vendor ?? ''">{{ c.vendor ?? '' }}</td>
+              <td class="max-w-48 truncate" :title="c.vendor ?? ''">{{ shortVendor(c.vendor) }}</td>
               <td class="tabular-nums">{{ c.vid ?? '' }}</td>
               <td class="whitespace-nowrap">
                 <RouterLink

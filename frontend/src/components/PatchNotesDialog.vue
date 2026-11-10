@@ -22,16 +22,16 @@ const releases = computed(() =>
       <section v-for="release in releases" :key="release.version">
         <div class="flex items-baseline gap-3">
           <h3 class="text-base font-semibold">v{{ release.version }}</h3>
-          <span v-if="release.version === APP_VERSION" class="badge badge-indigo">
+          <span v-if="release.version === APP_VERSION" class="badge badge-brand">
             <SparklesIcon class="size-3.5" /> {{ t('patchNotes.current') }}
           </span>
           <span class="ml-auto text-xs text-gray-500 dark:text-gray-400">{{ release.dateLabel }}</span>
         </div>
         <div v-for="section in release.sections" :key="section.title" class="mt-3">
-          <h4 class="text-xs font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400">{{ section.title }}</h4>
+          <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ section.title }}</h4>
           <ul class="mt-2 space-y-1.5">
             <li v-for="item in section.items" :key="item" class="flex gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <span class="mt-2 size-1.5 shrink-0 rounded-full bg-indigo-500" />
+              <span class="mt-2 size-1.5 shrink-0 rounded-full bg-brand-500" />
               {{ item }}
             </li>
           </ul>

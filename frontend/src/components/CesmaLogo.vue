@@ -14,6 +14,6 @@ const CONSOLE_LINE =
     <svg viewBox="0 0 24 24" class="shrink-0 fill-current" :class="size === 'lg' ? 'size-10' : 'size-7'" aria-hidden="true">
       <path :d="CONSOLE_LINE" />
     </svg>
-    <span v-if="!iconOnly">cesma<span class="text-indigo-400">-ng</span></span>
+    <span v-if="!iconOnly">cesma<span class="text-brand-400">-ng</span></span>
   </span>
 </template>

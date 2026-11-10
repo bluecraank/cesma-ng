@@ -8,6 +8,21 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-10
+
+### Hinzugefügt
+
+- Übersicht: die Kennzahlen (Online, Offline, …) sind anklickbar und öffnen die passend gefilterte Geräteliste
+- Geräteliste: Filter nach Status
+
+### Geändert
+
+- Ruhigeres Erscheinungsbild: gedecktes Blau als Akzentfarbe, flachere Karten, kompaktere Tabellen mit vertikal zentrierten Zeilen und Spaltenköpfen in normaler Schreibweise
+- Herstellernamen gekürzt und lesbar („KONICA MINOLTA HOLDINGS, INC.“ → „Konica Minolta“), voller Name als Tooltip
+- Monospace-Schrift nur noch für MAC-Adressen und Konfigurationen; VLAN-IDs, IPs und Portnamen in normaler Schrift mit Tabellenziffern
+- Geräteseite: seltene Aktionen (SSH-Schlüssel übertragen, Umbenennen, Löschen) im Menü „Mehr“
+- Kürzere, sachlichere Hinweistexte; Ein- und Mehrzahl statt „Gerät(e)“ / „Port(s)“
+
 ## [0.9.1] - 2026-11-10
 
 ### Geändert

@@ -71,7 +71,7 @@ watch(allUsers, load)
         <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">{{ t('sshKeys.hint') }}</p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        <label v-if="auth.isSuperadmin" class="flex items-center gap-2 text-sm"><input v-model="allUsers" type="checkbox" class="accent-indigo-600" /> {{ t('sshKeys.allUsers') }}</label>
+        <label v-if="auth.isSuperadmin" class="flex items-center gap-2 text-sm"><input v-model="allUsers" type="checkbox" class="accent-brand-600" /> {{ t('sshKeys.allUsers') }}</label>
         <button v-if="auth.can('ssh_keys.push', sites.currentId)" type="button" class="btn btn-secondary" @click="push">
           <ArrowUpTrayIcon class="size-4" /> {{ t('sshKeys.push') }}
         </button>
