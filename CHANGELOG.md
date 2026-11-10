@@ -8,6 +8,12 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-10
+
+### Behoben
+
+- Switchports: auf kleineren Bildschirmen bzw. mit Windows-Skalierung (z. B. 150 %) passten 48/56-Port-Switches nicht in die Breite; die Ports werden dort jetzt etwas kleiner dargestellt
+
 ## [0.6.1] - 2026-11-10
 
 ### Geändert
