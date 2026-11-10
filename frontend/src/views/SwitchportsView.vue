@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** Front panel view of all switches: which ports are in use, which are free for a new connection. */
-import { MapPinIcon, SignalIcon } from '@heroicons/vue/20/solid'
+import { ArrowTopRightOnSquareIcon, MapPinIcon, PencilSquareIcon, SignalIcon } from '@heroicons/vue/20/solid'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/api/client'
@@ -8,6 +8,7 @@ import type { components } from '@/api/schema'
 import SwitchIcon from '@/components/SwitchIcon.vue'
 import UiSpinner from '@/components/ui/UiSpinner.vue'
 import { useNotify } from '@/composables/useNotify'
+import { useAuthStore } from '@/stores/auth'
 import { useSitesStore } from '@/stores/sites'
 import { formatDateTime } from '@/utils/format'
 import { panelLayout, portLabel } from '@/utils/switchPanel'
@@ -21,6 +22,7 @@ type LinkUp = components['schemas']['LinkUpOut']
 const { t, locale } = useI18n()
 const notify = useNotify()
 const sites = useSitesStore()
+const auth = useAuthStore()
 
 const DAYS = [7, 30, 90, 180, 365]
 /** Live state: every port without link counts as free, regardless of how long it has been down. */
@@ -221,11 +223,10 @@ function facts(p: SwitchPort): string[] {
         <p v-if="!finderEvents.length" class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
           <UiSpinner class="size-4" /> {{ t('finder.waiting') }}
         </p>
-        <RouterLink
+        <div
           v-for="e in finderEvents"
-          :key="`${e.port_id}-${e.at}`"
-          :to="{ name: 'device', params: { id: e.device_id }, query: { tab: 'ports', port: e.port_id } }"
-          class="flex flex-wrap items-start gap-x-6 gap-y-2 rounded-lg p-3 ring-1 hover:bg-gray-50 dark:hover:bg-white/5"
+          :key="e.port_id"
+          class="flex flex-wrap items-start gap-x-6 gap-y-2 rounded-lg p-3 ring-1"
           :class="e.still_up ? 'ring-amber-300 dark:ring-amber-500/40' : 'opacity-60 ring-gray-200 dark:ring-white/10'"
         >
           <div class="min-w-48">
@@ -236,7 +237,9 @@ function facts(p: SwitchPort): string[] {
               {{ time(e.at) }}
               <template v-if="e.building || e.room"> · {{ [e.building, e.room].filter(Boolean).join(' · ') }}</template>
               <template v-if="e.untagged_vlans.length"> · VLAN {{ e.untagged_vlans.join(', ') }}</template>
+              <template v-if="e.tagged_vlans.length"> · {{ t('finder.tagged') }} {{ e.tagged_vlans.length > 8 ? `${e.tagged_vlans.slice(0, 8).join(', ')} +${e.tagged_vlans.length - 8}` : e.tagged_vlans.join(', ') }}</template>
             </p>
+            <span v-if="e.link_ups > 1" class="badge badge-yellow mt-1 mr-1" :title="t('finder.flappingHint')">{{ t('finder.linkUps', { n: e.link_ups }) }}</span>
             <span v-if="!e.still_up" class="badge badge-gray mt-1">{{ t('finder.downAgain') }}</span>
             <span v-else-if="e.uplink" class="badge badge-indigo mt-1">Uplink</span>
           </div>
@@ -252,7 +255,22 @@ function facts(p: SwitchPort): string[] {
             </div>
             <p v-if="e.mac_count > e.connected.length" class="text-xs text-gray-500">{{ t('switchports.moreDevices', { n: e.mac_count - e.connected.length }) }}</p>
           </div>
-        </RouterLink>
+          <div class="flex shrink-0 flex-col gap-2 sm:items-end">
+            <RouterLink
+              v-if="auth.can('ports.edit', sites.currentId)"
+              :to="{ name: 'device', params: { id: e.device_id }, query: { tab: 'ports', port: e.port_id, edit: '1' } }"
+              class="btn btn-primary btn-sm"
+            >
+              <PencilSquareIcon class="size-4" /> {{ t('finder.editPort') }}
+            </RouterLink>
+            <RouterLink
+              :to="{ name: 'device', params: { id: e.device_id }, query: { tab: 'ports', port: e.port_id } }"
+              class="btn btn-secondary btn-sm"
+            >
+              <ArrowTopRightOnSquareIcon class="size-4" /> {{ t('finder.openPort') }}
+            </RouterLink>
+          </div>
+        </div>
       </div>
     </section>
 

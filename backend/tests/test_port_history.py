@@ -192,3 +192,12 @@ async def test_link_watch_finds_the_port_that_just_came_up(
     ] == []
     history = (await alice.get(f"/devices/{device_id}/ports/{target['id']}/history")).json()
     assert history["events"][0]["kind"] == "link_up"
+
+    # the link flaps (down, up again): still one entry for the port, with the count
+    async with app.state.database.sessionmaker() as db:
+        await db.execute(update(Port).where(Port.id == target["id"]).values(oper_up=False))
+        await db.commit()
+    link_watch._sites.clear()
+    result = (await alice.post(f"/sites/{site}/link-watch", json={"since": since})).json()
+    found = [e for e in result["events"] if e["port_id"] == target["id"]]
+    assert len(found) == 1 and found[0]["link_ups"] == 2

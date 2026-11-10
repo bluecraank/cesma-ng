@@ -16,6 +16,8 @@ const props = defineProps<{
   canEdit: boolean
   /** scroll to this port, open and highlight it */
   focusPortId?: number | null
+  /** also open the edit dialog (VLANs etc.) for the focused port */
+  editFocused?: boolean
 }>()
 const emit = defineEmits<{ changed: [] }>()
 const { t, locale } = useI18n()
@@ -65,6 +67,7 @@ watch(
     onlyUplinks.value = false
     highlighted.value = port.id
     void toggle(port)
+    if (props.editFocused && props.canEdit) edit([port])
     await nextTick()
     document.getElementById(`port-${port.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   },

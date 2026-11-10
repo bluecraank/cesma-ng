@@ -472,6 +472,11 @@ const en: typeof de = {
   },
   vlanPicker: { placeholder: 'Type VLAN ID or name …', unknownHint: 'This VLAN does not exist at the site' },
   finder: {
+    tagged: 'Tagged',
+    linkUps: '{n}× up',
+    flappingHint: 'The link came up several times in this period (e.g. device restarted or replugged).',
+    editPort: 'Edit port',
+    openPort: 'Open port',
     title: 'Port finder',
     hint: 'Someone is plugging in a device somewhere? Switch on – cesma-ng shows live which port just went up and which device (MAC, IP) is connected.',
     start: 'Switch on',

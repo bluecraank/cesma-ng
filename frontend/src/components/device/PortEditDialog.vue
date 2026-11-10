@@ -50,6 +50,7 @@ const initial = computed<Record<number, Member>>(() => {
   return result
 })
 
+// immediate: the dialog may be created already open (opened directly via a link)
 watch(open, async (isOpen) => {
   if (!isOpen) return
   plan.value = null
@@ -61,6 +62,14 @@ watch(open, async (isOpen) => {
   filter.value = ''
   onlyAssigned.value = props.vlans.length > 12
   profiles.value = await api.get<PortProfile[]>(`/sites/${props.siteId}/port-profiles`).catch(() => [])
+}, { immediate: true })
+
+// VLANs that arrive after the dialog opened (e.g. opened directly from a link) start with the
+// port's current state, not as "changed".
+watch(initial, (now) => {
+  if (!open.value) return
+  const missing = Object.keys(now).filter((vid) => !(vid in members.value))
+  if (missing.length) members.value = { ...Object.fromEntries(missing.map((vid) => [vid, now[Number(vid)]!])), ...members.value }
 })
 
 // Any edit invalidates the preview.

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Cesma NG",
-    "version": "0.9.0"
+    "version": "0.9.1"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -6037,6 +6037,13 @@
             "type": "array",
             "title": "Untagged Vlans"
           },
+          "tagged_vlans": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Tagged Vlans"
+          },
           "device_id": {
             "type": "integer",
             "title": "Device Id"
@@ -6077,6 +6084,10 @@
           "mac_count": {
             "type": "integer",
             "title": "Mac Count"
+          },
+          "link_ups": {
+            "type": "integer",
+            "title": "Link Ups"
           }
         },
         "type": "object",
@@ -6089,12 +6100,14 @@
           "uplink",
           "speed_mbps",
           "untagged_vlans",
+          "tagged_vlans",
           "device_id",
           "device_name",
           "building",
           "room",
           "connected",
-          "mac_count"
+          "mac_count",
+          "link_ups"
         ],
         "title": "LinkUpOut"
       },

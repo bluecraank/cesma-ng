@@ -470,6 +470,11 @@ export default {
   },
   vlanPicker: { placeholder: 'VLAN-ID oder Name eingeben …', unknownHint: 'Dieses VLAN gibt es am Standort nicht' },
   finder: {
+    tagged: 'Tagged',
+    linkUps: '{n}× up',
+    flappingHint: 'Der Link ist in dieser Zeit mehrmals hochgekommen (z. B. Gerät neu gestartet oder umgesteckt).',
+    editPort: 'Port bearbeiten',
+    openPort: 'Port öffnen',
     title: 'Port-Erkennung',
     hint: 'Jemand schließt irgendwo ein Gerät an? Einschalten – cesma-ng zeigt dann live, welcher Port gerade auf UP gegangen ist und welches Gerät (MAC, IP) daran hängt.',
     start: 'Einschalten',

@@ -58,7 +58,9 @@ FDB_WINDOW = timedelta(minutes=3)
 SCAN_TIMEOUT = 5.0
 FDB_TIMEOUT = 20.0
 PARALLEL = 10
-EVENT_LIMIT = 50
+#: ports listed, and link-up events looked at (a flapping port has several)
+PORT_LIMIT = 50
+EVENT_LIMIT = 500
 DEVICES_PER_PORT = 5
 
 
@@ -256,18 +258,28 @@ async def recent_link_ups(db: AsyncSession, site_id: int, since: datetime) -> li
     )
     if not rows:
         return []
-    port_ids = list({port.id for _, port, _, _, _ in rows})
+    # one entry per port (newest link-up); a port that flapped while being plugged in, or whose
+    # change was also seen by the regular poll, must not show up twice
+    ups: dict[int, int] = {}
+    latest = []
+    for row in rows:
+        port_id = row[1].id
+        if port_id not in ups:
+            latest.append(row)
+        ups[port_id] = ups.get(port_id, 0) + 1
+    rows = latest[:PORT_LIMIT]
+    port_ids = [port.id for _, port, _, _, _ in rows]
     uplinks = await uplink_port_ids(db)
     macs: dict[int, list[str]] = {}
-    for port_id, mac in (
+    for fdb_port, mac in (
         await db.execute(
             select(FdbEntry.port_id, FdbEntry.mac_address)
             .where(FdbEntry.port_id.in_(port_ids))
             .order_by(FdbEntry.mac_address)
         )
     ).all():
-        if port_id is not None and mac not in macs.setdefault(port_id, []):
-            macs[port_id].append(mac)
+        if fdb_port is not None and mac not in macs.setdefault(fdb_port, []):
+            macs[fdb_port].append(mac)
     all_macs = sorted({m for found in macs.values() for m in found[:DEVICES_PER_PORT]})
     vendors = await vendors_for(db, all_macs)
     clients = {
@@ -302,12 +314,14 @@ async def recent_link_ups(db: AsyncSession, site_id: int, since: datetime) -> li
             "uplink": port.id in uplinks,
             "speed_mbps": port.speed_mbps,
             "untagged_vlans": [v.vid for v in port.vlans if not v.tagged],
+            "tagged_vlans": [v.vid for v in port.vlans if v.tagged],
             "device_id": device.id,
             "device_name": device.name,
             "building": building.name if building else None,
             "room": room.name if room else None,
             "connected": [connected(m) for m in macs.get(port.id, [])[:DEVICES_PER_PORT]],
             "mac_count": len(macs.get(port.id, [])),
+            "link_ups": ups[port.id],
         }
         for event, port, device, room, building in rows
     ]

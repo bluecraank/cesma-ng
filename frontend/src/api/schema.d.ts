@@ -1743,6 +1743,8 @@ export interface components {
             speed_mbps: number | null;
             /** Untagged Vlans */
             untagged_vlans: number[];
+            /** Tagged Vlans */
+            tagged_vlans: number[];
             /** Device Id */
             device_id: number;
             /** Device Name */
@@ -1755,6 +1757,8 @@ export interface components {
             connected: components["schemas"]["ConnectedDeviceOut"][];
             /** Mac Count */
             mac_count: number;
+            /** Link Ups */
+            link_ups: number;
         };
         /** LinkWatchIn */
         LinkWatchIn: {

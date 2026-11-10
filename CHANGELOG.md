@@ -8,6 +8,18 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-10
+
+### Geändert
+
+- Port-Erkennung: Knopf „Port bearbeiten“ öffnet den Port auf der Geräteseite direkt im Bearbeiten-Dialog (VLANs, Beschreibung, Status); zusätzlich „Port öffnen“
+- Port-Erkennung: zeigt neben dem untagged VLAN auch die tagged VLANs des Ports
+
+### Behoben
+
+- Port-Erkennung: ein Port wurde doppelt angezeigt, wenn der Link beim Einstecken kurz flatterte (oder das normale Polling den Wechsel ebenfalls sah); jetzt ein Eintrag pro Port, bei mehreren Link-Ups mit Hinweis „2× up“
+- Port-Dialog per Direktlink geöffnet: alle VLANs galten als „geändert“ und der aktuelle VLAN-Stand des Ports fehlte
+
 ## [0.9.0] - 2026-11-10
 
 ### Hinzugefügt

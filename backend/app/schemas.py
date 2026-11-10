@@ -617,12 +617,15 @@ class LinkUpOut(BaseModel):
     uplink: bool
     speed_mbps: int | None
     untagged_vlans: list[int]
+    tagged_vlans: list[int]
     device_id: int
     device_name: str
     building: str | None
     room: str | None
     connected: list[ConnectedDeviceOut]
     mac_count: int
+    #: how often the link came up in the watched time (more than once: flapping or replugged)
+    link_ups: int
 
 
 class LinkWatchOut(BaseModel):

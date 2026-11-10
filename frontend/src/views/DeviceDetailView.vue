@@ -227,6 +227,7 @@ watch(() => props.id, load, { immediate: true })
       :vlans="vlans"
       :can-edit="canEditPorts"
       :focus-port-id="focusPortId"
+      :edit-focused="route.query.edit === '1'"
       @changed="load"
     />
     <ConsoleTab v-else-if="tab === 'console'" :device-id="device.id" :model="device.model" />
