@@ -304,6 +304,10 @@ export default {
     external: 'Andere LLDP-Nachbarn zeigen',
     fit: 'Einpassen',
     linkDown: 'Verbindung down',
+    center: 'Zentrum',
+    auto: 'Automatisch',
+    labelsHint: 'Portnamen erscheinen beim Hineinzoomen oder wenn man über einen Switch fährt.',
+    links: '{n} Links',
   },
   stats: {
     title: 'Datenverkehr',
@@ -330,6 +334,9 @@ export default {
     accepted: 'Gerät übernommen – es wird ab jetzt abgefragt',
   },
   reports: {
+    noSite: 'Kein Standort ausgewählt.',
+    failed: 'Bericht konnte nicht geladen werden',
+    retry: 'Erneut versuchen',
     title: 'Berichte',
     firmware: 'Firmware-Stände',
     backups: 'Backups älter als 2 Tage',
@@ -463,6 +470,9 @@ export default {
   },
   vlanPicker: { placeholder: 'VLAN-ID oder Name eingeben …', unknownHint: 'Dieses VLAN gibt es am Standort nicht' },
   switchports: {
+    connected: 'Verbunden',
+    moreDevices: '+ {n} weitere Geräte',
+    noDevice: 'Link aktiv, aber kein Gerät in der MAC-Tabelle.',
     title: 'Switchports',
     hint: 'Frontansicht aller Switches: ungerade Ports oben, gerade unten. Grün sind freie Ports – kein Link, kein Uplink und seit der gewählten Zeit kein Gerät. Klick auf einen Port öffnet ihn auf der Geräteseite.',
     place: 'Gebäude / Raum',

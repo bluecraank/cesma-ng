@@ -8,6 +8,22 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-10
+
+### Hinzugefügt
+
+- Switchports: Infokarte beim Überfahren eines Ports – zeigt sofort, welche Geräte verbunden sind (Hostname/IP, MAC, Hersteller, „+ n weitere“), den LLDP-Nachbarn (z. B. Switch oder Access Point) sowie VLAN, Geschwindigkeit, PoE und seit wann kein Link besteht
+- Topologie: Auswahl „Zentrum“ – welcher Switch in der Mitte steht (pro Standort gemerkt)
+
+### Geändert
+
+- Topologie neu als Sterntopologie: Core-Switch in der Mitte, die übrigen Switches ringförmig darum, Endgeräte und andere LLDP-Nachbarn fächern um ihren Switch auf; das Bild wird berechnet statt simuliert – es ist schnell und sieht nach jedem Neuladen gleich aus
+- Topologie: deutlich mehr Abstand, mehrere Links zwischen zwei Switches (LAG) als eine dickere Linie, Portnamen erst beim Hineinzoomen; beim Überfahren eines Switches werden seine Verbindungen hervorgehoben und der Rest ausgeblendet
+
+### Behoben
+
+- Berichte: die Seite blieb komplett leer, wenn der Bericht nicht geladen werden konnte; jetzt mit Ladeanzeige, Fehlermeldung und „Erneut versuchen“
+
 ## [0.7.1] - 2026-11-10
 
 ### Geändert

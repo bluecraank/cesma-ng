@@ -105,7 +105,10 @@ async def _errors(db: AsyncSession, ports: Any, names: dict[int, str]) -> list[d
         (
             await db.execute(
                 select(PortCounterSample)
-                .where(PortCounterSample.port_id.in_(by_id), PortCounterSample.sampled_at >= since)
+                .where(
+                    PortCounterSample.port_id.in_(list(by_id)),
+                    PortCounterSample.sampled_at >= since,
+                )
                 .order_by(PortCounterSample.port_id, PortCounterSample.sampled_at)
             )
         )

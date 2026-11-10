@@ -14,6 +14,8 @@ from app.models import (
     Client,
     Device,
     DeviceStatus,
+    FdbEntry,
+    LldpNeighbor,
     Port,
     PortEvent,
     PortMacSighting,
@@ -27,6 +29,8 @@ from app.services.uplinks import uplink_port_ids
 
 EVENT_LIMIT = 200
 SIGHTING_LIMIT = 200
+#: devices listed per port in the front panel tooltip
+CONNECTED_LIMIT = 3
 
 
 async def port_history(
@@ -144,9 +148,18 @@ async def switch_ports(
         .scalars()
         .all()
     )
+    connected, mac_counts = await _connected(db, [p.id for p in ports], uplinks)
+    neighbors = {
+        n.port_id: n
+        for n in (
+            await db.execute(select(LldpNeighbor).where(LldpNeighbor.device_id.in_(device_ids)))
+        ).scalars()
+        if n.port_id is not None
+    }
     by_device: dict[int, list[dict[str, Any]]] = {}
     for port in ports:
         uplink = port.id in uplinks
+        neighbor = neighbors.get(port.id)
         down_since = (
             ensure_utc(port.last_change_at) if port.last_change_at and not port.oper_up else None
         )
@@ -174,6 +187,13 @@ async def switch_ports(
                 "untagged_vlans": [v.vid for v in port.vlans if not v.tagged],
                 "tagged_count": sum(1 for v in port.vlans if v.tagged),
                 "poe": port.poe is not None,
+                "neighbor": (
+                    f"{neighbor.system_name or neighbor.chassis_id} ({neighbor.remote_port})"
+                    if neighbor
+                    else None
+                ),
+                "connected": connected.get(port.id, []),
+                "mac_count": mac_counts.get(port.id, 0),
             }
         )
     return [
@@ -190,3 +210,45 @@ async def switch_ports(
         for device, room, building in rows
         if by_device.get(device.id)
     ]
+
+
+async def _connected(
+    db: AsyncSession, port_ids: list[int], uplinks: set[int]
+) -> tuple[dict[int, list[dict[str, Any]]], dict[int, int]]:
+    """Devices currently in the MAC table of each access port (a few per port, plus the count)."""
+    access = [p for p in port_ids if p not in uplinks]
+    if not access:
+        return {}, {}
+    rows = (
+        await db.execute(
+            select(FdbEntry.port_id, FdbEntry.mac_address)
+            .where(FdbEntry.port_id.in_(access))
+            .order_by(FdbEntry.port_id, FdbEntry.mac_address)
+        )
+    ).all()
+    per_port: dict[int, list[str]] = {}
+    for port_id, mac in rows:
+        if port_id is None:
+            continue
+        macs = per_port.setdefault(port_id, [])
+        if mac not in macs:
+            macs.append(mac)
+    shown = sorted({m for macs in per_port.values() for m in macs[:CONNECTED_LIMIT]})
+    vendors = await vendors_for(db, shown)
+    clients = {
+        c.mac_address: c
+        for c in (await db.execute(select(Client).where(Client.mac_address.in_(shown)))).scalars()
+    }
+    connected = {
+        port_id: [
+            {
+                "mac_address": mac,
+                "vendor": vendors.get(mac),
+                "ip_address": c.ip_address if (c := clients.get(mac)) else None,
+                "hostname": c.hostname if c else None,
+            }
+            for mac in macs[:CONNECTED_LIMIT]
+        ]
+        for port_id, macs in per_port.items()
+    }
+    return connected, {port_id: len(macs) for port_id, macs in per_port.items()}

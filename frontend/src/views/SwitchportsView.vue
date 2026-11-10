@@ -81,19 +81,25 @@ function speed(mbps: number | null): string {
   return mbps >= 1000 ? `${mbps / 1000} Gbit/s` : `${mbps} Mbit/s`
 }
 
-function tooltip(p: SwitchPort): string {
-  const s = state(p)
+/** Hover card: shown immediately (the native title tooltip is slow and plain). */
+const hover = ref<{ port: SwitchPort; x: number; y: number; above: boolean } | null>(null)
+
+function showHover(port: SwitchPort, event: MouseEvent): void {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const above = rect.bottom > window.innerHeight - 260
+  const x = Math.min(Math.max(rect.left + rect.width / 2, 170), window.innerWidth - 170)
+  hover.value = { port, x, y: above ? rect.top - 8 : rect.bottom + 8, above }
+}
+
+function facts(p: SwitchPort): string[] {
   return [
-    `${p.name} – ${t(`switchports.legend.${s}`)}`,
     p.description,
     p.untagged_vlans.length ? `VLAN ${p.untagged_vlans.join(', ')}${p.tagged_count ? ` ${t('switchports.tagged', { n: p.tagged_count })}` : ''}` : '',
     p.oper_up ? speed(p.speed_mbps) : '',
     p.poe ? 'PoE' : '',
     !p.oper_up ? (p.down_since ? `${t('switchports.downSince')} ${formatDateTime(p.down_since, locale.value)}` : t('switchports.downSinceStart')) : '',
-    p.last_device_at ? `${t('switchports.lastDevice')} ${formatDateTime(p.last_device_at, locale.value)}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
+    !p.connected.length && p.last_device_at ? `${t('switchports.lastDevice')} ${formatDateTime(p.last_device_at, locale.value)}` : '',
+  ].filter(Boolean)
 }
 </script>
 
@@ -172,7 +178,10 @@ function tooltip(p: SwitchPort): string {
                     :to="{ name: 'device', params: { id: d.device_id }, query: { tab: 'ports', port: p.id } }"
                     class="relative flex h-6 w-6 2xl:h-7 2xl:w-8 items-center justify-center rounded-sm font-mono text-[0.5625rem] 2xl:text-[0.625rem] leading-none font-semibold transition"
                     :class="STYLE[state(p)]"
-                    :title="tooltip(p)"
+                    @mouseenter="showHover(p, $event)"
+                    @mouseleave="hover = null"
+                    @focus="showHover(p, $event as unknown as MouseEvent)"
+                    @blur="hover = null"
                   >
                     {{ portLabel(p.name) }}
                     <span v-if="p.poe" class="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-amber-400" />
@@ -185,5 +194,37 @@ function tooltip(p: SwitchPort): string {
         </div>
       </div>
     </section>
+
+    <!-- hover card -->
+    <div
+      v-if="hover"
+      class="pointer-events-none fixed z-50 w-80 -translate-x-1/2 rounded-lg bg-white p-3 text-sm shadow-xl ring-1 ring-gray-900/10 dark:bg-gray-800 dark:ring-white/10"
+      :class="hover.above ? '-translate-y-full' : ''"
+      :style="{ left: `${hover.x}px`, top: `${hover.y}px` }"
+    >
+      <div class="flex items-center justify-between gap-3">
+        <span class="font-mono font-semibold">{{ hover.port.name }}</span>
+        <span class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+          <span class="inline-block size-2.5 rounded-sm" :class="STYLE[state(hover.port)]" />
+          {{ t(`switchports.legend.${state(hover.port)}`) }}
+        </span>
+      </div>
+      <p v-for="line in facts(hover.port)" :key="line" class="mt-0.5 text-xs text-gray-600 dark:text-gray-300">{{ line }}</p>
+
+      <div v-if="hover.port.neighbor || hover.port.connected.length" class="mt-2 border-t border-gray-100 pt-2 dark:border-white/10">
+        <p class="mb-1 text-[0.6875rem] font-semibold tracking-wide text-gray-500 uppercase dark:text-gray-400">{{ t('switchports.connected') }}</p>
+        <p v-if="hover.port.neighbor" class="text-xs"><span class="badge badge-indigo mr-1">LLDP</span>{{ hover.port.neighbor }}</p>
+        <div v-for="c in hover.port.connected" :key="c.mac_address" class="mt-1 text-xs">
+          <span class="font-medium">{{ c.hostname || c.ip_address || c.vendor || c.mac_address }}</span>
+          <span class="block font-mono text-[0.6875rem] text-gray-500 dark:text-gray-400">
+            {{ [c.hostname || c.ip_address ? c.mac_address : null, c.hostname || c.ip_address ? c.vendor : null, c.hostname ? c.ip_address : null].filter(Boolean).join(' · ') || c.mac_address }}
+          </span>
+        </div>
+        <p v-if="hover.port.mac_count > hover.port.connected.length" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {{ t('switchports.moreDevices', { n: hover.port.mac_count - hover.port.connected.length }) }}
+        </p>
+      </div>
+      <p v-else-if="hover.port.oper_up && !hover.port.uplink" class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('switchports.noDevice') }}</p>
+    </div>
   </div>
 </template>

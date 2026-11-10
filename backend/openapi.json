@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Cesma NG",
-    "version": "0.7.1"
+    "version": "0.8.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -4762,6 +4762,55 @@
         ],
         "title": "ComplianceRuleOut"
       },
+      "ConnectedDeviceOut": {
+        "properties": {
+          "mac_address": {
+            "type": "string",
+            "title": "Mac Address"
+          },
+          "vendor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vendor"
+          },
+          "ip_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Address"
+          },
+          "hostname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hostname"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mac_address",
+          "vendor",
+          "ip_address",
+          "hostname"
+        ],
+        "title": "ConnectedDeviceOut"
+      },
       "ConsoleIn": {
         "properties": {
           "command": {
@@ -7462,6 +7511,28 @@
           "poe": {
             "type": "boolean",
             "title": "Poe"
+          },
+          "neighbor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Neighbor"
+          },
+          "connected": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectedDeviceOut"
+            },
+            "type": "array",
+            "title": "Connected"
+          },
+          "mac_count": {
+            "type": "integer",
+            "title": "Mac Count"
           }
         },
         "type": "object",
@@ -7479,7 +7550,10 @@
           "last_device_at",
           "untagged_vlans",
           "tagged_count",
-          "poe"
+          "poe",
+          "neighbor",
+          "connected",
+          "mac_count"
         ],
         "title": "SwitchPortOut"
       },

@@ -306,6 +306,10 @@ const en: typeof de = {
     external: 'Show other LLDP neighbours',
     fit: 'Fit',
     linkDown: 'Link down',
+    center: 'Centre',
+    auto: 'Automatic',
+    labelsHint: 'Port names appear when zooming in or hovering a switch.',
+    links: '{n} links',
   },
   stats: {
     title: 'Traffic',
@@ -332,6 +336,9 @@ const en: typeof de = {
     accepted: 'Device accepted – it will be polled from now on',
   },
   reports: {
+    noSite: 'No site selected.',
+    failed: 'Could not load the report',
+    retry: 'Try again',
     title: 'Reports',
     firmware: 'Firmware versions',
     backups: 'Backups older than 2 days',
@@ -465,6 +472,9 @@ const en: typeof de = {
   },
   vlanPicker: { placeholder: 'Type VLAN ID or name …', unknownHint: 'This VLAN does not exist at the site' },
   switchports: {
+    connected: 'Connected',
+    moreDevices: '+ {n} more devices',
+    noDevice: 'Link up, but no device in the MAC table.',
     title: 'Switch ports',
     hint: 'Front view of all switches: odd ports on top, even ports below. Green ports are free – no link, no uplink and no device for the chosen time. Click a port to open it on the device page.',
     place: 'Building / room',

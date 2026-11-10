@@ -1364,6 +1364,17 @@ export interface components {
             /** Enabled */
             enabled: boolean;
         };
+        /** ConnectedDeviceOut */
+        ConnectedDeviceOut: {
+            /** Mac Address */
+            mac_address: string;
+            /** Vendor */
+            vendor: string | null;
+            /** Ip Address */
+            ip_address: string | null;
+            /** Hostname */
+            hostname: string | null;
+        };
         /** ConsoleIn */
         ConsoleIn: {
             /** Command */
@@ -2247,6 +2258,12 @@ export interface components {
             tagged_count: number;
             /** Poe */
             poe: boolean;
+            /** Neighbor */
+            neighbor: string | null;
+            /** Connected */
+            connected: components["schemas"]["ConnectedDeviceOut"][];
+            /** Mac Count */
+            mac_count: number;
         };
         /** SwitchPortsDeviceOut */
         SwitchPortsDeviceOut: {

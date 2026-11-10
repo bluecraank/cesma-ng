@@ -87,6 +87,10 @@ async def test_switchports_mark_free_ports(
     free = {n for n, p in ports.items() if p["free"]}
     assert free and all(not ports[n]["oper_up"] and not ports[n]["uplink"] for n in free)
     assert not any(p["free"] for p in ports.values() if p["oper_up"] or p["uplink"])
+    # the tooltip shows what is connected: MAC table entries on access ports, LLDP neighbours
+    with_devices = [p for p in ports.values() if p["connected"]]
+    assert with_devices and all(p["mac_count"] >= len(p["connected"]) > 0 for p in with_devices)
+    assert not any(p["connected"] for p in ports.values() if p["uplink"])
 
     # a port that went down yesterday is not free when 30 days are required
     one = next(iter(free))

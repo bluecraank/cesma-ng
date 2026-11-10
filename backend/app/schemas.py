@@ -563,6 +563,13 @@ class PortHistoryOut(BaseModel):
     devices: list[PortDeviceOut]
 
 
+class ConnectedDeviceOut(BaseModel):
+    mac_address: str
+    vendor: str | None
+    ip_address: str | None
+    hostname: str | None
+
+
 class SwitchPortOut(BaseModel):
     id: int
     name: str
@@ -578,6 +585,11 @@ class SwitchPortOut(BaseModel):
     untagged_vlans: list[int]
     tagged_count: int
     poe: bool
+    #: LLDP neighbour on this port ("name (port)"), e.g. another switch or an access point
+    neighbor: str | None
+    #: devices currently in the MAC table (the first few) and their total number
+    connected: list[ConnectedDeviceOut]
+    mac_count: int
 
 
 class SwitchPortsDeviceOut(BaseModel):
