@@ -17,12 +17,12 @@ from app.schemas import (
     DeviceHintOut,
     DeviceVlanOut,
     FdbEntryOut,
-    FreePortsDeviceOut,
     LldpNeighborOut,
     PollStateOut,
     PortHistoryOut,
     PortOut,
     PortStatsOut,
+    SwitchPortsDeviceOut,
     TopologyOut,
 )
 from app.services import compliance, credentials, inventory_query, polling, port_history
@@ -105,8 +105,8 @@ async def history(device_id: int, port_id: int, db: Db, caller: CallerDep) -> ob
     return await port_history.port_history(db, caller, device_id, port_id)
 
 
-@router.get("/sites/{site_id}/free-ports", response_model=list[FreePortsDeviceOut])
-async def free_ports(
+@router.get("/sites/{site_id}/switchports", response_model=list[SwitchPortsDeviceOut])
+async def switchports(
     site_id: int,
     db: Db,
     caller: CallerDep,
@@ -115,7 +115,8 @@ async def free_ports(
     min_days: Annotated[int, Query(ge=0, le=3650)] = 30,
     include_disabled: bool = False,
 ) -> object:
-    return await port_history.free_ports(
+    """Ethernet ports of all switches for the front panel view, with free ports marked."""
+    return await port_history.switch_ports(
         db,
         caller,
         site_id,

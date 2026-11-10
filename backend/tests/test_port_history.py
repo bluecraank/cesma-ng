@@ -71,20 +71,25 @@ async def test_devices_seen_only_on_access_ports(
     assert sightings[0].mac_address in {d["mac_address"] for d in history["devices"]}
 
 
-async def test_free_ports(alice: AsyncClient, bob: AsyncClient, app, settings: Settings) -> None:  # type: ignore[no-untyped-def]
+async def test_switchports_mark_free_ports(
+    alice: AsyncClient, bob: AsyncClient, app, settings: Settings
+) -> None:  # type: ignore[no-untyped-def]
     settings = await _simulated_app(app, settings)
     device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
     site = (await alice.get(f"/devices/{device_id}")).json()["site_id"]
-    assert (await bob.get(f"/sites/{site}/free-ports")).status_code == 403
+    assert (await bob.get(f"/sites/{site}/switchports")).status_code == 403
     await grant(alice, "bob", {site: "viewer"})
 
-    free = (await bob.get(f"/sites/{site}/free-ports", params={"min_days": 0})).json()
-    names = {p["name"] for p in free[0]["ports"]}
-    ports = {p["name"]: p for p in (await alice.get(f"/devices/{device_id}/ports")).json()}
-    assert names and all(not ports[n]["oper_up"] and not ports[n]["is_uplink"] for n in names)
+    panel = (await bob.get(f"/sites/{site}/switchports", params={"min_days": 0})).json()[0]
+    assert panel["model"] == "aruba_os_switch"
+    ports = {p["name"]: p for p in panel["ports"]}
+    assert len(ports) >= 48  # all ethernet ports, not only the free ones
+    free = {n for n, p in ports.items() if p["free"]}
+    assert free and all(not ports[n]["oper_up"] and not ports[n]["uplink"] for n in free)
+    assert not any(p["free"] for p in ports.values() if p["oper_up"] or p["uplink"])
 
     # a port that went down yesterday is not free when 30 days are required
-    one = next(iter(names))
+    one = next(iter(free))
     async with app.state.database.sessionmaker() as db:
         await db.execute(
             update(Port)
@@ -92,8 +97,8 @@ async def test_free_ports(alice: AsyncClient, bob: AsyncClient, app, settings: S
             .values(last_change_at=utcnow() - timedelta(days=1))
         )
         await db.commit()
-    free = (await bob.get(f"/sites/{site}/free-ports", params={"min_days": 30})).json()
-    assert one not in {p["name"] for d in free for p in d["ports"]}
+    panel = (await bob.get(f"/sites/{site}/switchports", params={"min_days": 30})).json()[0]
+    assert not next(p for p in panel["ports"] if p["name"] == one)["free"]
 
 
 async def test_compliance_rules(

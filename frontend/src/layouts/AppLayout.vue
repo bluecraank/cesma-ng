@@ -99,7 +99,7 @@ const sections = computed(() => [
       { to: '/vlans', icon: QueueListIcon, label: t('nav.vlans') },
       { to: '/backups', icon: ArchiveBoxIcon, label: t('nav.backups') },
       { to: '/notifications', icon: BellIcon, label: t('nav.notifications') },
-      { to: '/free-ports', icon: ViewfinderCircleIcon, label: t('nav.freePorts') },
+      { to: '/switchports', icon: ViewfinderCircleIcon, label: t('nav.switchports') },
       { to: '/compliance', icon: ClipboardDocumentCheckIcon, label: t('nav.compliance') },
       { to: '/reports', icon: ChartBarIcon, label: t('nav.reports') },
       { to: '/audit', icon: ClipboardDocumentListIcon, label: t('nav.audit') },

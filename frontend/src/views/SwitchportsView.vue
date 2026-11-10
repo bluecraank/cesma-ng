@@ -1,0 +1,182 @@
+<script setup lang="ts">
+/** Front panel view of all switches: which ports are in use, which are free for a new connection. */
+import { MapPinIcon } from '@heroicons/vue/20/solid'
+import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { api } from '@/api/client'
+import type { components } from '@/api/schema'
+import SwitchIcon from '@/components/SwitchIcon.vue'
+import UiSpinner from '@/components/ui/UiSpinner.vue'
+import { useNotify } from '@/composables/useNotify'
+import { useSitesStore } from '@/stores/sites'
+import { formatDateTime } from '@/utils/format'
+import { panelLayout, portLabel } from '@/utils/switchPanel'
+
+type SwitchPorts = components['schemas']['SwitchPortsDeviceOut']
+type SwitchPort = components['schemas']['SwitchPortOut']
+type State = 'free' | 'up' | 'uplink' | 'down' | 'disabled'
+
+const { t, locale } = useI18n()
+const notify = useNotify()
+const sites = useSitesStore()
+
+const DAYS = [0, 7, 30, 90, 180, 365]
+const place = ref('') // "" | "b:<id>" | "r:<id>"
+const minDays = ref(30)
+const includeDisabled = ref(false)
+const onlyPoe = ref(false)
+const onlyWithFree = ref(false)
+const result = ref<SwitchPorts[]>([])
+const loading = ref(false)
+
+const buildings = computed(() => sites.current?.buildings ?? [])
+
+function state(p: SwitchPort): State {
+  if (p.free && (!onlyPoe.value || p.poe)) return 'free'
+  if (p.uplink) return 'uplink'
+  if (p.oper_up) return 'up'
+  return p.admin_up ? 'down' : 'disabled'
+}
+
+const switches = computed(() =>
+  result.value
+    .map((d) => {
+      const counts = { free: 0, up: 0, uplink: 0, down: 0, disabled: 0 }
+      for (const p of d.ports) counts[state(p)] += 1
+      return { ...d, counts, units: panelLayout(d.ports) }
+    })
+    .filter((d) => !onlyWithFree.value || d.counts.free),
+)
+const totalFree = computed(() => switches.value.reduce((sum, d) => sum + d.counts.free, 0))
+
+async function load(): Promise<void> {
+  if (sites.currentId === null) return
+  loading.value = true
+  const params: Record<string, string | number | boolean> = { min_days: minDays.value, include_disabled: includeDisabled.value }
+  if (place.value.startsWith('b:')) params.building_id = Number(place.value.slice(2))
+  if (place.value.startsWith('r:')) params.room_id = Number(place.value.slice(2))
+  await notify.run(async () => {
+    result.value = await api.get<SwitchPorts[]>(`/sites/${sites.currentId}/switchports`, params)
+  })
+  loading.value = false
+}
+
+watch(() => sites.currentId, () => (place.value = ''))
+watch([() => sites.currentId, place, minDays, includeDisabled], load, { immediate: true })
+
+/** Colours are fixed (not theme dependent) because the panel itself is always dark. */
+const STYLE: Record<State, string> = {
+  free: 'bg-green-500 text-white ring-2 ring-green-300 hover:bg-green-400',
+  up: 'bg-sky-600 text-white hover:bg-sky-500',
+  uplink: 'bg-violet-600 text-white hover:bg-violet-500',
+  down: 'bg-gray-600 text-gray-200 hover:bg-gray-500',
+  disabled: 'bg-gray-800 text-gray-500 line-through ring-1 ring-red-500/60 hover:bg-gray-700',
+}
+const LEGEND: State[] = ['free', 'up', 'uplink', 'down', 'disabled']
+
+function speed(mbps: number | null): string {
+  if (!mbps) return ''
+  return mbps >= 1000 ? `${mbps / 1000} Gbit/s` : `${mbps} Mbit/s`
+}
+
+function tooltip(p: SwitchPort): string {
+  const s = state(p)
+  return [
+    `${p.name} – ${t(`switchports.legend.${s}`)}`,
+    p.description,
+    p.untagged_vlans.length ? `VLAN ${p.untagged_vlans.join(', ')}${p.tagged_count ? ` ${t('switchports.tagged', { n: p.tagged_count })}` : ''}` : '',
+    p.oper_up ? speed(p.speed_mbps) : '',
+    p.poe ? 'PoE' : '',
+    !p.oper_up ? (p.down_since ? `${t('switchports.downSince')} ${formatDateTime(p.down_since, locale.value)}` : t('switchports.downSinceStart')) : '',
+    p.last_device_at ? `${t('switchports.lastDevice')} ${formatDateTime(p.last_device_at, locale.value)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+</script>
+
+<template>
+  <div class="space-y-6">
+    <div>
+      <h1 class="page-title">{{ t('switchports.title') }}</h1>
+      <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('switchports.hint') }}</p>
+    </div>
+
+    <div class="card flex flex-wrap items-end gap-4 p-4">
+      <div class="field">
+        <label class="label" for="sp-place">{{ t('switchports.place') }}</label>
+        <select id="sp-place" v-model="place" class="input w-64">
+          <option value="">{{ t('switchports.allPlaces') }}</option>
+          <template v-for="b in buildings" :key="b.id">
+            <option :value="`b:${b.id}`">{{ b.name }}</option>
+            <option v-for="r in b.rooms" :key="r.id" :value="`r:${r.id}`">&nbsp;&nbsp;{{ b.name }} · {{ r.name }}</option>
+          </template>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label" for="sp-days">{{ t('switchports.freeAfter') }}</label>
+        <select id="sp-days" v-model="minDays" class="input w-48">
+          <option v-for="d in DAYS" :key="d" :value="d">{{ d === 0 ? t('switchports.now') : t('switchports.days', { n: d }) }}</option>
+        </select>
+      </div>
+      <div class="flex flex-col gap-1 pb-1 text-sm">
+        <label class="flex items-center gap-2"><input v-model="onlyPoe" type="checkbox" class="accent-indigo-600" /> {{ t('switchports.onlyPoe') }}</label>
+        <label class="flex items-center gap-2"><input v-model="includeDisabled" type="checkbox" class="accent-indigo-600" /> {{ t('switchports.includeDisabled') }}</label>
+      </div>
+      <label class="flex items-center gap-2 pb-1 text-sm"><input v-model="onlyWithFree" type="checkbox" class="accent-indigo-600" /> {{ t('switchports.onlyWithFree') }}</label>
+      <span class="ml-auto pb-1 text-sm text-gray-500 dark:text-gray-400">{{ t('switchports.summary', { free: totalFree, switches: switches.length }) }}</span>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
+      <span v-for="s in LEGEND" :key="s" class="flex items-center gap-1.5">
+        <span class="inline-block size-3.5 rounded-sm" :class="STYLE[s]" />
+        {{ t(`switchports.legend.${s}`) }}
+      </span>
+      <span class="flex items-center gap-1.5"><span class="inline-block size-1.5 rounded-full bg-amber-400" /> PoE</span>
+    </div>
+
+    <UiSpinner v-if="loading && !result.length" class="mx-auto" />
+    <p v-else-if="!switches.length" class="card p-6 text-sm text-gray-500">{{ t('switchports.none') }}</p>
+
+    <section v-for="d in switches" :key="d.device_id" class="card">
+      <header class="flex flex-wrap items-center gap-3 border-b border-gray-200 px-5 py-3 dark:border-white/10">
+        <SwitchIcon :model="d.model" :status="d.status" />
+        <RouterLink :to="{ name: 'device', params: { id: d.device_id } }" class="link font-semibold">{{ d.device_name }}</RouterLink>
+        <span v-if="d.model_name" class="text-sm text-gray-500 dark:text-gray-400">{{ d.model_name }}</span>
+        <span v-if="d.building || d.room" class="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
+          <MapPinIcon class="size-4" /> {{ [d.building, d.room].filter(Boolean).join(' · ') }}
+        </span>
+        <span class="ml-auto flex gap-2 text-xs">
+          <span class="badge" :class="d.counts.free ? 'badge-green' : 'badge-gray'">{{ t('switchports.free', { n: d.counts.free }) }}</span>
+          <span class="badge badge-blue">{{ t('switchports.active', { n: d.counts.up + d.counts.uplink }) }}</span>
+          <span class="badge badge-gray">{{ t('switchports.ports', { n: d.ports.length }) }}</span>
+        </span>
+      </header>
+
+      <div class="overflow-x-auto p-4">
+        <div class="inline-flex min-w-max flex-col gap-2 rounded-lg bg-gray-800 p-3 shadow-inner ring-1 ring-black/20 dark:bg-gray-950 dark:ring-white/10">
+          <div v-for="unit in d.units" :key="unit.unit" class="flex items-center gap-5">
+            <span v-if="d.units.length > 1" class="w-4 text-center font-mono text-[10px] text-gray-400" :title="t('switchports.unit')">{{ unit.unit }}</span>
+            <div v-for="block in unit.blocks" :key="block.key" class="flex">
+              <div v-for="(col, ci) in block.columns" :key="ci" class="flex flex-col gap-1" :class="ci > 0 ? (ci % 6 === 0 ? 'ml-3' : 'ml-1') : ''">
+                <template v-for="(p, ri) in col" :key="ri">
+                  <RouterLink
+                    v-if="p"
+                    :to="{ name: 'device', params: { id: d.device_id }, query: { tab: 'ports', port: p.id } }"
+                    class="relative flex h-7 w-8 items-center justify-center rounded-sm font-mono text-[10px] leading-none font-semibold transition"
+                    :class="STYLE[state(p)]"
+                    :title="tooltip(p)"
+                  >
+                    {{ portLabel(p.name) }}
+                    <span v-if="p.poe" class="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-amber-400" />
+                  </RouterLink>
+                  <span v-else class="h-7 w-8" />
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</template>

@@ -8,6 +8,17 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-10
+
+### Hinzugefügt
+
+- Switchports: Frontansicht aller Switches wie am Gerät – ungerade Ports oben, gerade unten, Uplink-/SFP-Ports als eigener Block, Stack-Einheiten untereinander; Farben für frei, Link aktiv, Uplink, kein Link und deaktiviert, PoE-Punkt, Details beim Überfahren, Klick öffnet den Port
+
+### Geändert
+
+- „Freie Ports“ ist in der Switchport-Ansicht aufgegangen: freie Ports sind dort grün markiert, mit denselben Filtern (Gebäude/Raum, unbenutzt seit, PoE, deaktivierte Ports) und optional nur Switches mit freien Ports
+- Tabellenköpfe bleiben beim Scrollen sichtbar; lange Tabellen scrollen innerhalb ihrer Karte
+
 ## [0.5.0] - 2026-11-09
 
 ### Hinzugefügt

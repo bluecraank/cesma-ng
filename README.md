@@ -49,7 +49,7 @@ Die Änderungen pro Version stehen im [CHANGELOG](CHANGELOG.md). Die Anwendung z
   - Benachrichtigungen
   - Audit-Log mit alten und neuen Werten
   - Konfigurationsregeln, geprüft gegen die Backups
-  - freie Ports pro Gebäude/Raum
+  - Switchports: Frontansicht aller Switches mit freien Ports pro Gebäude/Raum
   - Port-Verlauf: Link- und Konfigurationsänderungen, angeschlossene Geräte
   - globale Suche (Strg+K)
   - Konsole für lesende Befehle

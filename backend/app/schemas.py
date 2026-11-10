@@ -563,23 +563,32 @@ class PortHistoryOut(BaseModel):
     devices: list[PortDeviceOut]
 
 
-class FreePortOut(BaseModel):
+class SwitchPortOut(BaseModel):
     id: int
     name: str
+    if_index: int
     description: str
     admin_up: bool
+    oper_up: bool
+    speed_mbps: int | None
+    uplink: bool
+    free: bool
     down_since: UtcDatetime | None
     last_device_at: UtcDatetime | None
     untagged_vlans: list[int]
+    tagged_count: int
     poe: bool
 
 
-class FreePortsDeviceOut(BaseModel):
+class SwitchPortsDeviceOut(BaseModel):
     device_id: int
     device_name: str
+    model: DeviceModel
+    model_name: str | None
+    status: DeviceStatus
     room: str | None
     building: str | None
-    ports: list[FreePortOut]
+    ports: list[SwitchPortOut]
 
 
 class ComplianceRuleIn(BaseModel):

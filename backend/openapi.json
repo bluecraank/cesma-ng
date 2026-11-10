@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Cesma NG",
-    "version": "0.5.0"
+    "version": "0.6.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -1277,13 +1277,14 @@
         }
       }
     },
-    "/api/v1/sites/{site_id}/free-ports": {
+    "/api/v1/sites/{site_id}/switchports": {
       "get": {
         "tags": [
           "inventory"
         ],
-        "summary": "Free Ports",
-        "operationId": "free_ports_api_v1_sites__site_id__free_ports_get",
+        "summary": "Switchports",
+        "description": "Ethernet ports of all switches for the front panel view, with free ports marked.",
+        "operationId": "switchports_api_v1_sites__site_id__switchports_get",
         "parameters": [
           {
             "name": "site_id",
@@ -1357,9 +1358,9 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/FreePortsDeviceOut"
+                    "$ref": "#/components/schemas/SwitchPortsDeviceOut"
                   },
-                  "title": "Response Free Ports Api V1 Sites  Site Id  Free Ports Get"
+                  "title": "Response Switchports Api V1 Sites  Site Id  Switchports Get"
                 }
               }
             }
@@ -5599,123 +5600,6 @@
         ],
         "title": "FdbEntryOut"
       },
-      "FreePortOut": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description"
-          },
-          "admin_up": {
-            "type": "boolean",
-            "title": "Admin Up"
-          },
-          "down_since": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Down Since"
-          },
-          "last_device_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Device At"
-          },
-          "untagged_vlans": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
-            "title": "Untagged Vlans"
-          },
-          "poe": {
-            "type": "boolean",
-            "title": "Poe"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "description",
-          "admin_up",
-          "down_since",
-          "last_device_at",
-          "untagged_vlans",
-          "poe"
-        ],
-        "title": "FreePortOut"
-      },
-      "FreePortsDeviceOut": {
-        "properties": {
-          "device_id": {
-            "type": "integer",
-            "title": "Device Id"
-          },
-          "device_name": {
-            "type": "string",
-            "title": "Device Name"
-          },
-          "room": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Room"
-          },
-          "building": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Building"
-          },
-          "ports": {
-            "items": {
-              "$ref": "#/components/schemas/FreePortOut"
-            },
-            "type": "array",
-            "title": "Ports"
-          }
-        },
-        "type": "object",
-        "required": [
-          "device_id",
-          "device_name",
-          "room",
-          "building",
-          "ports"
-        ],
-        "title": "FreePortsDeviceOut"
-      },
       "GatewayIn": {
         "properties": {
           "name": {
@@ -7494,6 +7378,180 @@
           "created_at"
         ],
         "title": "SshKeyOut"
+      },
+      "SwitchPortOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "if_index": {
+            "type": "integer",
+            "title": "If Index"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "admin_up": {
+            "type": "boolean",
+            "title": "Admin Up"
+          },
+          "oper_up": {
+            "type": "boolean",
+            "title": "Oper Up"
+          },
+          "speed_mbps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed Mbps"
+          },
+          "uplink": {
+            "type": "boolean",
+            "title": "Uplink"
+          },
+          "free": {
+            "type": "boolean",
+            "title": "Free"
+          },
+          "down_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Down Since"
+          },
+          "last_device_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Device At"
+          },
+          "untagged_vlans": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Untagged Vlans"
+          },
+          "tagged_count": {
+            "type": "integer",
+            "title": "Tagged Count"
+          },
+          "poe": {
+            "type": "boolean",
+            "title": "Poe"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "if_index",
+          "description",
+          "admin_up",
+          "oper_up",
+          "speed_mbps",
+          "uplink",
+          "free",
+          "down_since",
+          "last_device_at",
+          "untagged_vlans",
+          "tagged_count",
+          "poe"
+        ],
+        "title": "SwitchPortOut"
+      },
+      "SwitchPortsDeviceOut": {
+        "properties": {
+          "device_id": {
+            "type": "integer",
+            "title": "Device Id"
+          },
+          "device_name": {
+            "type": "string",
+            "title": "Device Name"
+          },
+          "model": {
+            "$ref": "#/components/schemas/DeviceModel"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DeviceStatus"
+          },
+          "room": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room"
+          },
+          "building": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building"
+          },
+          "ports": {
+            "items": {
+              "$ref": "#/components/schemas/SwitchPortOut"
+            },
+            "type": "array",
+            "title": "Ports"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "device_name",
+          "model",
+          "model_name",
+          "status",
+          "room",
+          "building",
+          "ports"
+        ],
+        "title": "SwitchPortsDeviceOut"
       },
       "TopologyEdge": {
         "properties": {

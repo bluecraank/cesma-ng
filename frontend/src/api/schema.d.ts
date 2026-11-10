@@ -401,15 +401,18 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/sites/{site_id}/free-ports": {
+    "/api/v1/sites/{site_id}/switchports": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Free Ports */
-        get: operations["free_ports_api_v1_sites__site_id__free_ports_get"];
+        /**
+         * Switchports
+         * @description Ethernet ports of all switches for the front panel view, with free ports marked.
+         */
+        get: operations["switchports_api_v1_sites__site_id__switchports_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1597,38 +1600,6 @@ export interface components {
              */
             seen_at: string;
         };
-        /** FreePortOut */
-        FreePortOut: {
-            /** Id */
-            id: number;
-            /** Name */
-            name: string;
-            /** Description */
-            description: string;
-            /** Admin Up */
-            admin_up: boolean;
-            /** Down Since */
-            down_since: string | null;
-            /** Last Device At */
-            last_device_at: string | null;
-            /** Untagged Vlans */
-            untagged_vlans: number[];
-            /** Poe */
-            poe: boolean;
-        };
-        /** FreePortsDeviceOut */
-        FreePortsDeviceOut: {
-            /** Device Id */
-            device_id: number;
-            /** Device Name */
-            device_name: string;
-            /** Room */
-            room: string | null;
-            /** Building */
-            building: string | null;
-            /** Ports */
-            ports: components["schemas"]["FreePortOut"][];
-        };
         /** GatewayIn */
         GatewayIn: {
             /** Name */
@@ -2245,6 +2216,54 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** SwitchPortOut */
+        SwitchPortOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** If Index */
+            if_index: number;
+            /** Description */
+            description: string;
+            /** Admin Up */
+            admin_up: boolean;
+            /** Oper Up */
+            oper_up: boolean;
+            /** Speed Mbps */
+            speed_mbps: number | null;
+            /** Uplink */
+            uplink: boolean;
+            /** Free */
+            free: boolean;
+            /** Down Since */
+            down_since: string | null;
+            /** Last Device At */
+            last_device_at: string | null;
+            /** Untagged Vlans */
+            untagged_vlans: number[];
+            /** Tagged Count */
+            tagged_count: number;
+            /** Poe */
+            poe: boolean;
+        };
+        /** SwitchPortsDeviceOut */
+        SwitchPortsDeviceOut: {
+            /** Device Id */
+            device_id: number;
+            /** Device Name */
+            device_name: string;
+            model: components["schemas"]["DeviceModel"];
+            /** Model Name */
+            model_name: string | null;
+            status: components["schemas"]["DeviceStatus"];
+            /** Room */
+            room: string | null;
+            /** Building */
+            building: string | null;
+            /** Ports */
+            ports: components["schemas"]["SwitchPortOut"][];
         };
         /** TopologyEdge */
         TopologyEdge: {
@@ -3271,7 +3290,7 @@ export interface operations {
             };
         };
     };
-    free_ports_api_v1_sites__site_id__free_ports_get: {
+    switchports_api_v1_sites__site_id__switchports_get: {
         parameters: {
             query?: {
                 building_id?: number | null;
@@ -3293,7 +3312,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FreePortsDeviceOut"][];
+                    "application/json": components["schemas"]["SwitchPortsDeviceOut"][];
                 };
             };
             /** @description Validation Error */

@@ -92,7 +92,7 @@ async def port_history(
     }
 
 
-async def free_ports(
+async def switch_ports(
     db: AsyncSession,
     caller: Caller,
     site_id: int,
@@ -102,7 +102,11 @@ async def free_ports(
     min_days: int = 30,
     include_disabled: bool = False,
 ) -> list[dict[str, Any]]:
-    """Access ports that are down and had no device for ``min_days``, grouped by switch."""
+    """All ethernet ports of the site's switches, grouped by switch, for the front panel view.
+
+    A port is *free* when it is not an uplink, has no link, and neither went down nor had a
+    device within ``min_days`` (disabled ports only count with ``include_disabled``).
+    """
     require_site_access(caller.user, site_id)
     stmt = (
         select(Device, Room, Building)
@@ -129,15 +133,11 @@ async def free_ports(
         .group_by(PortMacSighting.port_id)
     )
     last_device = {port_id: seen for port_id, seen in sighting_rows.all()}
-    candidates = (
+    ports = (
         (
             await db.execute(
                 select(Port)
-                .where(
-                    Port.device_id.in_(device_ids),
-                    Port.kind == PortKind.ETHERNET,
-                    Port.oper_up.is_(False),
-                )
+                .where(Port.device_id.in_(device_ids), Port.kind == PortKind.ETHERNET)
                 .order_by(Port.device_id, Port.if_index)
             )
         )
@@ -145,22 +145,34 @@ async def free_ports(
         .all()
     )
     by_device: dict[int, list[dict[str, Any]]] = {}
-    for port in candidates:
-        if port.id in uplinks or (not include_disabled and not port.admin_up):
-            continue
-        down_since = ensure_utc(port.last_change_at) if port.last_change_at else None
+    for port in ports:
+        uplink = port.id in uplinks
+        down_since = (
+            ensure_utc(port.last_change_at) if port.last_change_at and not port.oper_up else None
+        )
         seen = last_device.get(port.id)
-        if (down_since and down_since > cutoff) or (seen and ensure_utc(seen) > cutoff):
-            continue
+        free = (
+            not uplink
+            and not port.oper_up
+            and (include_disabled or port.admin_up)
+            and not (down_since and down_since > cutoff)
+            and not (seen and ensure_utc(seen) > cutoff)
+        )
         by_device.setdefault(port.device_id, []).append(
             {
                 "id": port.id,
                 "name": port.name,
+                "if_index": port.if_index,
                 "description": port.description,
                 "admin_up": port.admin_up,
+                "oper_up": port.oper_up,
+                "speed_mbps": port.speed_mbps,
+                "uplink": uplink,
+                "free": free,
                 "down_since": down_since,
                 "last_device_at": seen,
                 "untagged_vlans": [v.vid for v in port.vlans if not v.tagged],
+                "tagged_count": sum(1 for v in port.vlans if v.tagged),
                 "poe": port.poe is not None,
             }
         )
@@ -168,6 +180,9 @@ async def free_ports(
         {
             "device_id": device.id,
             "device_name": device.name,
+            "model": device.model,
+            "model_name": device.model_name,
+            "status": device.status,
             "room": room.name if room else None,
             "building": building.name if building else None,
             "ports": by_device[device.id],

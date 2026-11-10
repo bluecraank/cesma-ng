@@ -91,11 +91,16 @@
     @apply bg-blue-50 text-blue-700 ring-blue-700/10 dark:bg-blue-400/10 dark:text-blue-400 dark:ring-blue-400/30;
   }
 
+  /* Tables scroll inside their card (at most one screen high), so the header row can stay
+     visible while scrolling. A sticky header would not work with an overflow-x wrapper alone. */
   .table-wrap {
-    @apply overflow-x-auto;
+    @apply max-h-[calc(100dvh-5.5rem)] overflow-auto;
   }
   .table {
     @apply min-w-full divide-y divide-gray-200 text-sm dark:divide-white/10;
+  }
+  .table thead th {
+    @apply sticky top-0 z-[5] bg-white shadow-[inset_0_-1px_0] shadow-gray-200 dark:bg-gray-900 dark:shadow-white/10;
   }
   .table th {
     @apply px-3 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap text-gray-500 uppercase dark:text-gray-400;
