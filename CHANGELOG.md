@@ -8,6 +8,21 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-10
+
+### Geändert
+
+- Seitenleiste einklappen per Pfeil rechts neben dem Logo (statt unten in der Leiste)
+- Scrollbalken der Seitenleiste schmal und dunkel, passend zum Menü
+
+### Behoben
+
+- Dark Mode: aufgeklappte Auswahllisten waren weiß auf weiß; Listen, Scrollbalken und andere Bedienelemente des Browsers folgen jetzt dem Farbschema
+
+### Entfernt
+
+- Eigene Anzeigegröße wieder entfernt; die Darstellung folgt wieder nur der Windows-Skalierung bzw. dem Browser-Zoom (Strg + / Strg −)
+
 ## [0.7.0] - 2026-11-10
 
 ### Hinzugefügt

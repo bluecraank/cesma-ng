@@ -14,8 +14,6 @@ import {
   CpuChipIcon,
   GlobeAltIcon,
   MagnifyingGlassIcon,
-  MinusIcon,
-  PlusIcon,
   UserGroupIcon,
   BuildingOffice2Icon,
   ChevronDoubleLeftIcon,
@@ -38,7 +36,6 @@ import { APP_VERSION } from '@/changelog'
 import CesmaLogo from '@/components/CesmaLogo.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
 import PatchNotesDialog from '@/components/PatchNotesDialog.vue'
-import { useScale } from '@/composables/useScale'
 import { useTheme } from '@/composables/useTheme'
 import { setLocale } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -51,7 +48,6 @@ const sites = useSitesStore()
 const notifications = useNotificationsStore()
 const router = useRouter()
 const { theme, toggle } = useTheme()
-const { scale, smaller, larger, reset } = useScale()
 const mobileOpen = ref(false)
 const COLLAPSED_KEY = 'cesma.sidebarCollapsed'
 const collapsed = ref(readFlag(COLLAPSED_KEY))
@@ -155,16 +151,26 @@ async function logout(): Promise<void> {
       class="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-gray-900 transition-[transform,width] duration-200 lg:translate-x-0 dark:border-r dark:border-white/10 dark:bg-gray-950"
       :class="[mobileOpen ? 'translate-x-0' : '-translate-x-full', compact && 'lg:w-16']"
     >
-      <div class="flex h-16 shrink-0 items-center justify-between gap-2" :class="compact ? 'px-4' : 'px-6'">
+      <div class="flex h-16 shrink-0 items-center justify-between" :class="compact ? 'gap-0.5 px-1.5' : 'gap-2 pr-3 pl-6'">
         <RouterLink to="/" class="text-white" :title="compact ? 'cesma-ng' : undefined">
           <CesmaLogo :icon-only="compact" />
         </RouterLink>
+        <button
+          type="button"
+          class="hidden rounded-md p-1 text-gray-500 hover:bg-white/5 hover:text-white lg:block"
+          :title="collapsed ? t('nav.expand') : t('nav.collapse')"
+          :aria-label="collapsed ? t('nav.expand') : t('nav.collapse')"
+          @click="collapsed = !collapsed"
+        >
+          <ChevronDoubleRightIcon v-if="collapsed" class="size-4" />
+          <ChevronDoubleLeftIcon v-else class="size-5" />
+        </button>
         <button type="button" class="rounded-md p-1 text-gray-400 hover:text-white lg:hidden" @click="mobileOpen = false">
           <XMarkIcon class="size-6" />
         </button>
       </div>
 
-      <nav class="flex flex-1 flex-col gap-6 overflow-x-hidden overflow-y-auto py-2" :class="compact ? 'px-2' : 'px-4'" @click="mobileOpen = false">
+      <nav class="sidebar-scroll flex flex-1 flex-col gap-6 overflow-x-hidden overflow-y-auto py-2" :class="compact ? 'px-2' : 'px-4'" @click="mobileOpen = false">
         <div v-for="(section, i) in sections" :key="i">
           <div v-if="section.title && !compact" class="mb-2 px-2 text-xs font-semibold whitespace-nowrap text-gray-500">{{ section.title }}</div>
           <div v-else-if="section.title" class="mx-2 mb-2 border-t border-white/10" />
@@ -210,16 +216,6 @@ async function logout(): Promise<void> {
         <span>{{ compact ? `v${APP_VERSION}` : `cesma-ng v${APP_VERSION}` }}</span>
         <span v-if="!compact">{{ t('patchNotes.link') }}</span>
       </button>
-      <button
-        type="button"
-        class="hidden items-center gap-2 border-t border-white/10 py-2.5 text-xs whitespace-nowrap text-gray-500 hover:bg-white/5 hover:text-gray-300 lg:flex"
-        :class="compact ? 'justify-center' : 'px-6'"
-        :title="collapsed ? t('nav.expand') : t('nav.collapse')"
-        @click="collapsed = !collapsed"
-      >
-        <ChevronDoubleRightIcon v-if="collapsed" class="size-4" />
-        <template v-else><ChevronDoubleLeftIcon class="size-4" /> {{ t('nav.collapse') }}</template>
-      </button>
     </aside>
 
     <PatchNotesDialog v-model:open="patchNotesOpen" />
@@ -262,15 +258,6 @@ async function logout(): Promise<void> {
             {{ notifications.open > 99 ? '99+' : notifications.open }}
           </span>
         </RouterLink>
-        <div class="hidden items-center rounded-md ring-1 ring-gray-200 sm:flex dark:ring-white/10" :title="t('nav.scale')">
-          <button type="button" class="rounded-l-md p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-white/5" :aria-label="t('nav.scaleDown')" :disabled="scale <= 75" @click="smaller">
-            <MinusIcon class="size-4" />
-          </button>
-          <button type="button" class="w-12 text-center text-xs font-medium text-gray-600 tabular-nums hover:text-indigo-600 dark:text-gray-300" :title="t('nav.scaleReset')" @click="reset">{{ scale }}&nbsp;%</button>
-          <button type="button" class="rounded-r-md p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-white/5" :aria-label="t('nav.scaleUp')" :disabled="scale >= 150" @click="larger">
-            <PlusIcon class="size-4" />
-          </button>
-        </div>
         <button type="button" class="btn-icon" :title="t('nav.theme')" @click="toggle">
           <SunIcon v-if="theme === 'dark'" class="size-5" />
           <MoonIcon v-else class="size-5" />

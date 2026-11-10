@@ -20,10 +20,6 @@ const en: typeof de = {
     no: 'No',
   },
   nav: {
-    scale: 'Display size (this browser only)',
-    scaleDown: 'Smaller',
-    scaleUp: 'Larger',
-    scaleReset: 'Reset to 100 %',
     switchports: 'Switch ports',
     compliance: 'Config rules',
     roles: 'Roles',
