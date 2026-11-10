@@ -14,6 +14,8 @@ import {
   CpuChipIcon,
   GlobeAltIcon,
   MagnifyingGlassIcon,
+  MinusIcon,
+  PlusIcon,
   UserGroupIcon,
   BuildingOffice2Icon,
   ChevronDoubleLeftIcon,
@@ -36,6 +38,7 @@ import { APP_VERSION } from '@/changelog'
 import CesmaLogo from '@/components/CesmaLogo.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
 import PatchNotesDialog from '@/components/PatchNotesDialog.vue'
+import { useScale } from '@/composables/useScale'
 import { useTheme } from '@/composables/useTheme'
 import { setLocale } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -48,6 +51,7 @@ const sites = useSitesStore()
 const notifications = useNotificationsStore()
 const router = useRouter()
 const { theme, toggle } = useTheme()
+const { scale, smaller, larger, reset } = useScale()
 const mobileOpen = ref(false)
 const COLLAPSED_KEY = 'cesma.sidebarCollapsed'
 const collapsed = ref(readFlag(COLLAPSED_KEY))
@@ -258,6 +262,15 @@ async function logout(): Promise<void> {
             {{ notifications.open > 99 ? '99+' : notifications.open }}
           </span>
         </RouterLink>
+        <div class="hidden items-center rounded-md ring-1 ring-gray-200 sm:flex dark:ring-white/10" :title="t('nav.scale')">
+          <button type="button" class="rounded-l-md p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-white/5" :aria-label="t('nav.scaleDown')" :disabled="scale <= 75" @click="smaller">
+            <MinusIcon class="size-4" />
+          </button>
+          <button type="button" class="w-12 text-center text-xs font-medium text-gray-600 tabular-nums hover:text-indigo-600 dark:text-gray-300" :title="t('nav.scaleReset')" @click="reset">{{ scale }}&nbsp;%</button>
+          <button type="button" class="rounded-r-md p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-white/5" :aria-label="t('nav.scaleUp')" :disabled="scale >= 150" @click="larger">
+            <PlusIcon class="size-4" />
+          </button>
+        </div>
         <button type="button" class="btn-icon" :title="t('nav.theme')" @click="toggle">
           <SunIcon v-if="theme === 'dark'" class="size-5" />
           <MoonIcon v-else class="size-5" />

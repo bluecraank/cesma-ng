@@ -18,6 +18,10 @@ export default {
     no: 'Nein',
   },
   nav: {
+    scale: 'Anzeigegröße (nur in diesem Browser)',
+    scaleDown: 'Kleiner',
+    scaleUp: 'Größer',
+    scaleReset: 'Auf 100 % zurücksetzen',
     switchports: 'Switchports',
     compliance: 'Konfig-Regeln',
     roles: 'Rollen',

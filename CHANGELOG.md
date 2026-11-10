@@ -8,6 +8,12 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-10
+
+### Hinzugefügt
+
+- Eigene Anzeigegröße: oben rechts mit − / + zwischen 75 % und 150 % einstellen, Klick auf die Prozentzahl setzt auf 100 % zurück; gilt zusätzlich zur Windows-Skalierung und wird pro Browser gespeichert
+
 ## [0.6.2] - 2026-11-10
 
 ### Behoben

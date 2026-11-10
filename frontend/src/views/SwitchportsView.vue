@@ -163,14 +163,14 @@ function tooltip(p: SwitchPort): string {
       <div class="overflow-x-auto p-4">
         <div class="inline-flex min-w-max flex-col gap-2 rounded-lg bg-gray-800 p-2 2xl:p-3 shadow-inner ring-1 ring-black/20 dark:bg-gray-950 dark:ring-white/10">
           <div v-for="unit in d.units" :key="unit.unit" class="flex items-center gap-3 2xl:gap-5">
-            <span v-if="d.units.length > 1" class="w-4 text-center font-mono text-[10px] text-gray-400" :title="t('switchports.unit')">{{ unit.unit }}</span>
+            <span v-if="d.units.length > 1" class="w-4 text-center font-mono text-[0.625rem] text-gray-400" :title="t('switchports.unit')">{{ unit.unit }}</span>
             <div v-for="block in unit.blocks" :key="block.key" class="flex">
               <div v-for="(col, ci) in block.columns" :key="ci" class="flex flex-col gap-0.5 2xl:gap-1" :class="ci > 0 ? (ci % 6 === 0 ? 'ml-2 2xl:ml-3' : 'ml-0.5 2xl:ml-1') : ''">
                 <template v-for="(p, ri) in col" :key="ri">
                   <RouterLink
                     v-if="p"
                     :to="{ name: 'device', params: { id: d.device_id }, query: { tab: 'ports', port: p.id } }"
-                    class="relative flex h-6 w-6 2xl:h-7 2xl:w-8 items-center justify-center rounded-sm font-mono text-[9px] 2xl:text-[10px] leading-none font-semibold transition"
+                    class="relative flex h-6 w-6 2xl:h-7 2xl:w-8 items-center justify-center rounded-sm font-mono text-[0.5625rem] 2xl:text-[0.625rem] leading-none font-semibold transition"
                     :class="STYLE[state(p)]"
                     :title="tooltip(p)"
                   >

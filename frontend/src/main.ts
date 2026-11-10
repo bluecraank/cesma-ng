@@ -3,6 +3,7 @@ import { createApp } from 'vue'
 
 import App from './App.vue'
 import { setUnauthorizedHandler } from './api/client'
+import './composables/useScale' // apply the stored display scale before the first render
 import { i18n } from './i18n'
 import { router } from './router'
 import { useAuthStore } from './stores/auth'
