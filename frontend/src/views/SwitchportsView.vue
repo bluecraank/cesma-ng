@@ -20,7 +20,9 @@ const { t, locale } = useI18n()
 const notify = useNotify()
 const sites = useSitesStore()
 
-const DAYS = [0, 7, 30, 90, 180, 365]
+const DAYS = [7, 30, 90, 180, 365]
+/** Live state: every port without link counts as free, regardless of how long it has been down. */
+const live = ref(false)
 const place = ref('') // "" | "b:<id>" | "r:<id>"
 const minDays = ref(30)
 const includeDisabled = ref(false)
@@ -52,7 +54,7 @@ const totalFree = computed(() => switches.value.reduce((sum, d) => sum + d.count
 async function load(): Promise<void> {
   if (sites.currentId === null) return
   loading.value = true
-  const params: Record<string, string | number | boolean> = { min_days: minDays.value, include_disabled: includeDisabled.value }
+  const params: Record<string, string | number | boolean> = { min_days: live.value ? 0 : minDays.value, include_disabled: includeDisabled.value }
   if (place.value.startsWith('b:')) params.building_id = Number(place.value.slice(2))
   if (place.value.startsWith('r:')) params.room_id = Number(place.value.slice(2))
   await notify.run(async () => {
@@ -62,7 +64,7 @@ async function load(): Promise<void> {
 }
 
 watch(() => sites.currentId, () => (place.value = ''))
-watch([() => sites.currentId, place, minDays, includeDisabled], load, { immediate: true })
+watch([() => sites.currentId, place, minDays, live, includeDisabled], load, { immediate: true })
 
 /** Colours are fixed (not theme dependent) because the panel itself is always dark. */
 const STYLE: Record<State, string> = {
@@ -115,9 +117,14 @@ function tooltip(p: SwitchPort): string {
       </div>
       <div class="field">
         <label class="label" for="sp-days">{{ t('switchports.freeAfter') }}</label>
-        <select id="sp-days" v-model="minDays" class="input w-48">
-          <option v-for="d in DAYS" :key="d" :value="d">{{ d === 0 ? t('switchports.now') : t('switchports.days', { n: d }) }}</option>
-        </select>
+        <div class="flex items-center gap-3">
+          <select id="sp-days" v-model="minDays" class="input w-40 disabled:cursor-not-allowed disabled:opacity-50" :disabled="live">
+            <option v-for="d in DAYS" :key="d" :value="d">{{ t('switchports.days', { n: d }) }}</option>
+          </select>
+          <label class="flex items-center gap-2 text-sm whitespace-nowrap" :title="t('switchports.liveHint')">
+            <input v-model="live" type="checkbox" class="accent-indigo-600" /> {{ t('switchports.live') }}
+          </label>
+        </div>
       </div>
       <div class="flex flex-col gap-1 pb-1 text-sm">
         <label class="flex items-center gap-2"><input v-model="onlyPoe" type="checkbox" class="accent-indigo-600" /> {{ t('switchports.onlyPoe') }}</label>

@@ -8,6 +8,12 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-10
+
+### Geändert
+
+- Switchports: statt der Auswahl „sofort“ gibt es neben „Frei, wenn unbenutzt seit“ einen Haken „Live-Zustand“ – dann gilt jeder Port ohne Link als frei
+
 ## [0.6.0] - 2026-11-10
 
 ### Hinzugefügt
