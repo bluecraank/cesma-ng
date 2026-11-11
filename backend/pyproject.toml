@@ -1,6 +1,6 @@
 [project]
 name = "cesma-ng"
-version = "0.14.4"
+version = "0.14.5"
 description = "Cesma NG - switch management for Dell N1500, Dell OS10 and HP/Aruba 2530"
 requires-python = ">=3.12"
 dependencies = [

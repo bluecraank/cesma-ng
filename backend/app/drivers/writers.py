@@ -213,12 +213,13 @@ class DnosCliWriter(CliWriter):
         login = self.credentials.ssh
         if not login.username:
             raise WriteError("The credential profile has no SSH user")
+        # DNOS 6 takes "crypto key pubkey-chain ssh" only together with "user-key" (no
+        # separate mode). "end" + "configure" returns to global config from any depth.
         return [
-            "crypto key pubkey-chain ssh",
-            f"user-key {login.username} rsa",
+            f"crypto key pubkey-chain ssh user-key {login.username} rsa",
             f'key-string "{rsa_public_key_blob(login.private_key)}"',
-            "exit",
-            "exit",
+            "end",
+            "configure",
             "ip ssh pubkey-auth",
         ]
 
