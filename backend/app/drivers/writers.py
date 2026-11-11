@@ -217,7 +217,8 @@ class DnosCliWriter(CliWriter):
         # separate mode). "end" + "configure" returns to global config from any depth.
         return [
             f"crypto key pubkey-chain ssh user-key {login.username} rsa",
-            f'key-string "{rsa_public_key_blob(login.private_key)}"',
+            # "UU-encoded DER" = the Base64 part; no spaces in it, so no quotes needed
+            f"key-string {rsa_public_key_blob(login.private_key)}",
             "end",
             "configure",
             "ip ssh pubkey-auth",

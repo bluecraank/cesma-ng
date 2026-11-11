@@ -124,7 +124,7 @@ async def test_dnos_deposits_cesmas_own_rsa_key() -> None:
     assert cli.commands == [
         "configure",
         "crypto key pubkey-chain ssh user-key admin rsa",  # one line on DNOS 6
-        f'key-string "{blob}"',
+        f"key-string {blob}",
         "end",
         "configure",
         "ip ssh pubkey-auth",
