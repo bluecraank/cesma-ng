@@ -8,6 +8,16 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-11-11
+
+### Behoben
+
+- SSH-Schlüssel übertragen auf ArubaOS-Switch schlug mit „HTTP 500“ fehl, weil Cesma die Anmeldeeinstellung des Switches in einem Format schrieb, das der Switch nicht kennt
+
+### Geändert
+
+- ArubaOS-Switch: Cesma lädt beim Übertragen nur noch die Schlüssel hoch und ändert die Anmeldemethoden des Switches nicht mehr. Ob Schlüssel und Passwort erlaubt sind, wird einmal am Switch eingestellt (`aaa authentication ssh login public-key local`)
+
 ## [0.14.0] - 2026-11-11
 
 ### Hinzugefügt

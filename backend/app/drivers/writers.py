@@ -378,36 +378,15 @@ class ArubaOsRestWriter(RestWriter):
         super().__init__(host, credentials, http_factory)
         self._sftp = sftp
 
-    @staticmethod
-    def ssh_auth(current: dict[str, Any]) -> dict[str, str]:
-        """Public key first; the previous login method (password, RADIUS, TACACS) stays as
-        the second one, so nobody is locked out."""
-        primary = current.get("primary_authentication_method") or "PAM_LOCAL"
-        secondary = current.get("secondary_authentication_method") or "SAM_NONE"
-        if primary != "PAM_PUBLIC_KEY":
-            secondary = {"PAM_RADIUS": "SAM_RADIUS", "PAM_TACACS": "SAM_TACACS"}.get(
-                primary, "SAM_LOCAL"
-            )
-        elif secondary == "SAM_NONE":
-            secondary = "SAM_LOCAL"
-        return {
-            "primary_authentication_method": "PAM_PUBLIC_KEY",
-            "secondary_authentication_method": secondary,
-        }
-
     async def push_ssh_keys(self, keys: Sequence[str]) -> int:
-        """Replace the manager keys (SFTP) and enable public key login (REST)."""
+        """Replace the manager keys (SFTP; the file lives in flash, no save needed).
+
+        The login methods of the switch are left alone: whether keys and/or passwords are
+        accepted is configured once on the switch (``aaa authentication ssh login
+        public-key local`` allows both).
+        """
         content = "".join(f"{key}\n" for key in keys)
         await self._sftp(self.host, self.credentials, self.AUTHORIZED_KEYS, content)
-        session = await self._session()
-        try:
-            current = await session.call(RestCall("GET", "/authentication/ssh")) or {}
-            await session.call(RestCall("PUT", "/authentication/ssh", self.ssh_auth(current)))
-            await session.call(RestCall("POST", "/cli", {"cmd": "write memory"}))
-        except HttpError as exc:
-            raise WriteError(str(exc)) from exc
-        finally:
-            await session.logout()
         return len(keys)
 
     def calls(self, operations: Sequence[Operation], api: str = "") -> list[RestCall]:

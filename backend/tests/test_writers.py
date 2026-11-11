@@ -241,48 +241,17 @@ async def test_arubaos_backup_decodes_cli_output() -> None:
     assert await w.running_config() == config
 
 
-@pytest.mark.parametrize(
-    ("primary", "secondary", "expected"),
-    [
-        ("PAM_LOCAL", "SAM_NONE", "SAM_LOCAL"),  # password stays as second method
-        ("PAM_RADIUS", "SAM_LOCAL", "SAM_RADIUS"),
-        ("PAM_TACACS", "SAM_NONE", "SAM_TACACS"),
-        ("PAM_PUBLIC_KEY", "SAM_NONE", "SAM_LOCAL"),  # earlier Cesma versions: key only
-        ("PAM_PUBLIC_KEY", "SAM_RADIUS", "SAM_RADIUS"),
-    ],
-)
-def test_arubaos_keeps_password_login(primary: str, secondary: str, expected: str) -> None:
-    current = {
-        "primary_authentication_method": primary,
-        "secondary_authentication_method": secondary,
-    }
-    assert ArubaOsRestWriter.ssh_auth(current) == {
-        "primary_authentication_method": "PAM_PUBLIC_KEY",
-        "secondary_authentication_method": expected,
-    }
-
-
-async def test_arubaos_push_uploads_keys_and_sets_auth() -> None:
-    uploads: list[str] = []
+async def test_arubaos_push_only_uploads_keys() -> None:
+    uploads: list[tuple[str, str]] = []
 
     async def sftp(host: str, creds: DeviceCredentials, path: str, text: str) -> None:
-        uploads.append(path)
+        uploads.append((path, text))
 
-    http = FakeHttp(
-        {
-            ("GET", "/rest/version"): {"version_element": [{"version": "v7.0"}]},
-            ("POST", "/rest/v7/login-sessions"): {"cookie": "sessionId=abc"},
-            ("GET", "/rest/v7/authentication/ssh"): {
-                "primary_authentication_method": "PAM_LOCAL",
-                "secondary_authentication_method": "SAM_NONE",
-            },
-        }
-    )
+    http = FakeHttp()
     w = ArubaOsRestWriter("sw", CREDS, http_factory=lambda base: http, sftp=sftp)
     assert await w.push_ssh_keys(["k1", "k2"]) == 2
-    assert uploads == ["/ssh/mgr_keys/authorized_keys"]
-    put = next(c for c in http.calls if c[0] == "PUT")
-    assert put[2]["secondary_authentication_method"] == "SAM_LOCAL"
+    assert uploads == [("/ssh/mgr_keys/authorized_keys", "k1\nk2\n")]
+    assert http.calls == []  # login methods of the switch stay as they are
 
 
 def test_arubaos_uses_http_when_configured() -> None:
