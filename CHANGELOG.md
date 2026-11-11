@@ -8,12 +8,17 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.14.6] - 2026-11-11
+
+### Behoben
+
+- Dell N1500: Den Schlüssel überträgt Cesma bei `key-string` jetzt ohne Anführungszeichen, wie es der Switch beschreibt („UU-encoded DER“)
+
 ## [0.14.5] - 2026-11-11
 
 ### Behoben
 
 - Dell N1500: Cesmas Schlüssel wurde nicht hinterlegt („Command not found“), weil DNOS 6 `crypto key pubkey-chain ssh` nur zusammen mit `user-key` in einer Zeile annimmt
-- Dell N1500: Den Schlüssel überträgt Cesma bei `key-string` jetzt ohne Anführungszeichen, wie es der Switch beschreibt („UU-encoded DER“)
 
 ## [0.14.4] - 2026-11-11
 
