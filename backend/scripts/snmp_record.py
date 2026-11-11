@@ -47,6 +47,9 @@ STANDARD_SUBTREES = {
     "ENTITY-MIB (model, serial)": "1.3.6.1.2.1.47.1.1.1",
     "POWER-ETHERNET-MIB (PoE)": "1.3.6.1.2.1.105",
     "LLDP-MIB": "1.0.8802.1.1.2",
+    # AOS-CX has no Q-BRIDGE VLAN tables (17.7.1.4); VLANs and PVIDs are only here
+    "IEEE8021-BRIDGE (base ports)": "1.3.111.2.802.1.1.2",
+    "IEEE8021-Q-BRIDGE (VLANs)": "1.3.111.2.802.1.1.4",
 }
 VENDOR_SUBTREES = {
     "Dell enterprise": "1.3.6.1.4.1.674",
