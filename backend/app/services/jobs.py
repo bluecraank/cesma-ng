@@ -230,16 +230,21 @@ async def _run_ssh_keys(ctx: JobContext) -> None:
             continue
         try:
             async with asyncio.timeout(APPLY_TIMEOUT):
-                await writer.push_ssh_keys(keys)
+                uploaded = await writer.push_ssh_keys(keys)
             await audit.record(
                 ctx.db,
                 ctx.caller.actor,
                 "ssh_keys.push",
-                f"{len(keys)} SSH keys uploaded to {device.name}",
+                f"{uploaded} SSH keys uploaded to {device.name}",
                 site_id=device.site_id,
                 device_id=device.id,
             )
-            await ctx.say(f"{device.name}: {len(keys)} key(s) uploaded", progress)
+            note = (
+                " (Cesma's own key, this model holds one key per user)"
+                if (writer.ssh_keys_own_only)
+                else ""
+            )
+            await ctx.say(f"{device.name}: {uploaded} key(s) uploaded{note}", progress)
         except (WriteError, TimeoutError) as exc:
             failed += 1
             await ctx.say(f"{device.name}: FAILED - {exc}", progress)

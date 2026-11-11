@@ -38,6 +38,23 @@ async def test_omitted_secrets_are_kept_empty_ones_cleared(alice: AsyncClient, a
     assert "api_password" not in profile.secrets_encrypted  # stored encrypted
 
 
+async def test_cesma_gets_its_own_rsa_key(alice: AsyncClient, bob: AsyncClient, app) -> None:  # type: ignore[no-untyped-def]
+    pid = (await alice.post("/credential-profiles", json={"name": "dell"})).json()["id"]
+    assert (await bob.post(f"/credential-profiles/{pid}/ssh-key")).status_code == 403
+    r = await alice.post(f"/credential-profiles/{pid}/ssh-key")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ssh_public_key"].startswith("ssh-rsa ") and "PRIVATE" not in r.text
+    assert body["secrets_set"] == ["ssh_private_key"]
+    # the private key is used for Cesma's own SSH logins
+    async with app.state.database.sessionmaker() as db:
+        profile = (await db.execute(select(CredentialProfile))).scalar_one()
+        creds = to_device_credentials(profile, app.state.secret_box)
+    assert creds.ssh.private_key and "OPENSSH PRIVATE KEY" in creds.ssh.private_key
+    listed = (await alice.get("/credential-profiles")).json()[0]
+    assert listed["ssh_public_key"] == body["ssh_public_key"]
+
+
 async def test_only_superadmin_manages_credentials(bob: AsyncClient) -> None:
     assert (await bob.get("/credential-profiles")).status_code == 403
 

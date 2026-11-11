@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/vue/20/solid'
-import { onMounted, ref } from 'vue'
+import { ClipboardDocumentIcon, KeyIcon, PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/vue/20/solid'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api, type CredentialProfile, type CredentialProfileIn } from '@/api/client'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import UiToggle from '@/components/ui/UiToggle.vue'
-import { useConfirmDelete } from '@/composables/useConfirm'
+import { useConfirm, useConfirmDelete } from '@/composables/useConfirm'
 import { useNotify } from '@/composables/useNotify'
 
 const { t } = useI18n()
 const notify = useNotify()
 const confirmDelete = useConfirmDelete()
+const { confirm } = useConfirm()
 
 const SECRET_KEYS = [
   'snmp_community',
@@ -74,6 +75,35 @@ async function save(): Promise<void> {
     open.value = false
     await load()
   }
+}
+
+const editing = computed(() => profiles.value.find((p) => p.id === editingId.value) ?? null)
+
+/** Cesma's own RSA key (Dell N1500 accepts only one RSA key per user). */
+async function generateKey(): Promise<void> {
+  const profile = editing.value
+  if (!profile) return
+  if (profile.secrets_set.includes('ssh_private_key')) {
+    const ok = await confirm({
+      title: t('credentials.generateKey'),
+      message: t('credentials.replaceKey'),
+      confirmLabel: t('credentials.generateKey'),
+      cancelLabel: t('common.cancel'),
+      danger: true,
+    })
+    if (!ok) return
+  }
+  const ok = await notify.run(async () => {
+    const updated = await api.post<CredentialProfile>(`/credential-profiles/${profile.id}/ssh-key`)
+    profiles.value = profiles.value.map((p) => (p.id === updated.id ? updated : p))
+  }, t('credentials.keyGenerated'))
+  if (ok) form.value.ssh_private_key = undefined
+}
+
+async function copyPublicKey(): Promise<void> {
+  if (!editing.value?.ssh_public_key) return
+  await navigator.clipboard.writeText(editing.value.ssh_public_key)
+  notify.success(t('credentials.copied'))
 }
 
 async function remove(profile: CredentialProfile): Promise<void> {
@@ -211,6 +241,19 @@ onMounted(load)
           <div class="field sm:col-span-2">
             <label class="label" for="c-key">{{ t('credentials.privateKey') }}</label>
             <textarea id="c-key" v-model="form.ssh_private_key" rows="3" class="input font-mono text-xs" :placeholder="t('credentials.secretHint')" />
+          </div>
+          <div v-if="editing" class="space-y-2 sm:col-span-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="label">{{ t('credentials.publicKey') }}</span>
+              <div class="flex gap-2">
+                <button v-if="editing.ssh_public_key" type="button" class="btn btn-secondary" @click="copyPublicKey">
+                  <ClipboardDocumentIcon class="size-4" /> {{ t('credentials.copy') }}
+                </button>
+                <button type="button" class="btn btn-secondary" @click="generateKey"><KeyIcon class="size-4" /> {{ t('credentials.generateKey') }}</button>
+              </div>
+            </div>
+            <p v-if="editing.ssh_public_key" class="rounded-md bg-gray-50 p-2 font-mono text-xs break-all dark:bg-white/5">{{ editing.ssh_public_key }}</p>
+            <p class="muted text-xs">{{ t('credentials.publicKeyHint') }}</p>
           </div>
         </fieldset>
       </form>

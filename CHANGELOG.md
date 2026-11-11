@@ -8,6 +8,18 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-11
+
+### Hinzugefügt
+
+- SSH-Schlüssel übertragen auf Dell OS10: alle Schlüssel der Liste als Schlüsseldatei des SSH-Benutzers (per SFTP)
+- SSH-Schlüssel übertragen auf Dell N1500: DNOS 6 speichert nur einen RSA-Schlüssel je Benutzer, deshalb wird dort Cesmas eigener Schlüssel hinterlegt und die Anmeldung per Schlüssel eingeschaltet
+- Zugangsprofile: Cesma kann ein eigenes RSA-Schlüsselpaar erzeugen; der öffentliche Schlüssel wird angezeigt und lässt sich kopieren
+
+### Geändert
+
+- ArubaOS-Switch: Nach dem Übertragen der Schlüssel bleibt die bisherige Anmeldung (Passwort, RADIUS oder TACACS) als zweite Methode erlaubt; vorher war danach nur noch die Anmeldung per Schlüssel möglich
+
 ## [0.13.0] - 2026-11-11
 
 ### Geändert

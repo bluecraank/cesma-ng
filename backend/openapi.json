@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Cesma NG",
-    "version": "0.13.0"
+    "version": "0.14.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -4034,6 +4034,49 @@
         }
       }
     },
+    "/api/v1/credential-profiles/{profile_id}/ssh-key": {
+      "post": {
+        "tags": [
+          "administration"
+        ],
+        "summary": "Generate Ssh Key",
+        "description": "Generate Cesma's own RSA key for this profile; the public key is in the response.",
+        "operationId": "generate_ssh_key_api_v1_credential_profiles__profile_id__ssh_key_post",
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialProfileOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/audit": {
       "get": {
         "tags": [
@@ -5158,6 +5201,17 @@
             "type": "array",
             "title": "Secrets Set",
             "default": []
+          },
+          "ssh_public_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ssh Public Key"
           }
         },
         "type": "object",

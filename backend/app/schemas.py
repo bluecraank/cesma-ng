@@ -147,6 +147,8 @@ class CredentialProfileOut(ORM):
     verify_tls: bool
     api_https: bool
     secrets_set: list[str] = []
+    #: public part of the stored private key (Cesma's own key); not secret
+    ssh_public_key: str | None = None
 
 
 # --- Devices ---------------------------------------------------------------------------------

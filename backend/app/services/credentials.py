@@ -4,6 +4,7 @@ import json
 from collections.abc import Sequence
 from typing import Any
 
+import asyncssh
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,6 +45,45 @@ def read_secrets(profile: CredentialProfile, box: SecretBox) -> dict[str, str]:
 def secrets_set(profile: CredentialProfile, box: SecretBox) -> list[str]:
     """Names of the secrets that have a value (for display, values are never returned)."""
     return sorted(k for k, v in read_secrets(profile, box).items() if v)
+
+
+def public_key_of(private_key: str | None) -> str | None:
+    """OpenSSH public key line for a stored private key (``None`` if absent or unreadable)."""
+    if not private_key:
+        return None
+    try:
+        key = asyncssh.import_private_key(private_key)
+    except (asyncssh.KeyImportError, ValueError):
+        return None
+    return key.export_public_key("openssh").decode().strip()
+
+
+def ssh_public_key(profile: CredentialProfile, box: SecretBox) -> str | None:
+    return public_key_of(read_secrets(profile, box).get("ssh_private_key"))
+
+
+async def generate_ssh_key(
+    db: AsyncSession, caller: Caller, box: SecretBox, profile_id: int
+) -> CredentialProfile:
+    """Give Cesma its own RSA key for this profile (replaces a stored private key).
+
+    RSA 2048, because Dell N-Series (DNOS 6) accepts only RSA/DSA keys.
+    """
+    require_superadmin(caller.user)
+    profile = await get_profile(db, profile_id)
+    key = asyncssh.generate_private_key("ssh-rsa", key_size=2048, comment=f"cesma-{profile.name}")
+    secrets = read_secrets(profile, box)
+    secrets["ssh_private_key"] = key.export_private_key("openssh").decode()
+    profile.secrets_encrypted = box.encrypt(json.dumps(secrets))
+    await db.flush()
+    await audit.record(
+        db,
+        caller.actor,
+        "credentials.update",
+        f"Credential profile {profile.name} saved",
+        new={"secrets_changed": ["ssh_private_key"], "generated": "ssh-rsa 2048"},
+    )
+    return profile
 
 
 def to_device_credentials(profile: CredentialProfile | None, box: SecretBox) -> DeviceCredentials:

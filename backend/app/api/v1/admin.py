@@ -55,6 +55,7 @@ async def delete_role(role_id: int, db: Db, caller: CallerDep) -> None:
 def _profile_out(profile: CredentialProfile, box: SecretBox) -> CredentialProfileOut:
     out = CredentialProfileOut.model_validate(profile)
     out.secrets_set = credentials.secrets_set(profile, box)
+    out.ssh_public_key = credentials.ssh_public_key(profile, box)
     return out
 
 
@@ -79,6 +80,12 @@ async def update_profile(
         db, caller, box, body.model_dump(exclude_unset=True), profile_id
     )
     return _profile_out(profile, box)
+
+
+@router.post("/credential-profiles/{profile_id}/ssh-key", response_model=CredentialProfileOut)
+async def generate_ssh_key(profile_id: int, db: Db, caller: CallerDep, box: Box) -> object:
+    """Generate Cesma's own RSA key for this profile; the public key is in the response."""
+    return _profile_out(await credentials.generate_ssh_key(db, caller, box, profile_id), box)
 
 
 @router.delete("/credential-profiles/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)

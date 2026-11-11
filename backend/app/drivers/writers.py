@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 from urllib.parse import quote
 
+import asyncssh
+
 from app.domain.changes import (
     CreateVlan,
     DeleteVlan,
@@ -38,9 +40,53 @@ class WriteError(Exception):
     """A switch rejected a change."""
 
 
+SftpUpload = Callable[
+    [str, DeviceCredentials, str, str], Awaitable[None]
+]  # host, creds, path, text
+
+
+async def sftp_upload(host: str, credentials: DeviceCredentials, path: str, text: str) -> None:
+    login = credentials.ssh
+    keys = [asyncssh.import_private_key(login.private_key)] if login.private_key else None
+    try:
+        async with (
+            asyncssh.connect(
+                host,
+                username=login.username,
+                password=login.password,
+                client_keys=keys,
+                known_hosts=None,
+            ) as conn,
+            conn.start_sftp_client() as sftp,
+            sftp.open(path, "w") as remote,
+        ):
+            await remote.write(text)
+    except (OSError, asyncssh.Error) as exc:
+        raise WriteError(f"SFTP upload to {host} failed: {exc}") from exc
+
+
+def rsa_public_key_blob(private_key: str | None) -> str:
+    """Base64 part of the RSA public key that belongs to Cesma's own private key."""
+    if not private_key:
+        raise WriteError(
+            "The credential profile has no private SSH key: generate Cesma's key there first"
+        )
+    try:
+        key = asyncssh.import_private_key(private_key)
+    except (asyncssh.KeyImportError, ValueError) as exc:
+        raise WriteError(
+            f"The private SSH key of the credential profile is invalid: {exc}"
+        ) from exc
+    if key.get_algorithm() != "ssh-rsa":
+        raise WriteError("This switch accepts only RSA keys: generate an RSA key for Cesma")
+    return key.export_public_key("openssh").decode().split()[1]
+
+
 class ConfigWriter(ABC):
     #: can upload SSH public keys for the management user
     supports_ssh_keys: ClassVar[bool] = False
+    #: the switch gets only Cesma's own key, not the user key list
+    ssh_keys_own_only: ClassVar[bool] = False
     #: can load a backup back onto the switch
     supports_restore: ClassVar[bool] = False
 
@@ -58,7 +104,9 @@ class ConfigWriter(ABC):
     @abstractmethod
     async def running_config(self) -> str: ...
 
-    async def push_ssh_keys(self, keys: Sequence[str]) -> None:
+    async def push_ssh_keys(self, keys: Sequence[str]) -> int:
+        """Put the key list on the switch (replacing what was there); returns how many keys
+        the switch now holds from Cesma."""
         raise WriteError("Uploading SSH keys is not supported for this model")
 
     async def restore(self, config: str) -> None:
@@ -109,7 +157,10 @@ class CliWriter(ConfigWriter):
     def render_one(self, op: Operation) -> list[str]: ...
 
     async def apply(self, operations: Sequence[Operation]) -> list[str]:
-        commands = self.render(operations)
+        return await self._configure(self.render(operations))
+
+    async def _configure(self, commands: Sequence[str]) -> list[str]:
+        """configure / commands / end / save; stops at the first rejected command."""
         if not commands:
             return []
         log: list[str] = []
@@ -153,6 +204,27 @@ class DnosCliWriter(CliWriter):
     """Dell N1500 / DNOS 6."""
 
     setup = ("enable", "terminal length 0")
+    #: DNOS 6 stores a single RSA key per user, so the user list cannot go there. Instead
+    #: Cesma deposits the public part of its own key (from the credential profile).
+    supports_ssh_keys = True
+    ssh_keys_own_only = True
+
+    def ssh_key_commands(self) -> list[str]:
+        login = self.credentials.ssh
+        if not login.username:
+            raise WriteError("The credential profile has no SSH user")
+        return [
+            "crypto key pubkey-chain ssh",
+            f"user-key {login.username} rsa",
+            f'key-string "{rsa_public_key_blob(login.private_key)}"',
+            "exit",
+            "exit",
+            "ip ssh pubkey-auth",
+        ]
+
+    async def push_ssh_keys(self, keys: Sequence[str]) -> int:
+        await self._configure(self.ssh_key_commands())
+        return 1
 
     def render_one(self, op: Operation) -> list[str]:
         match op:
@@ -195,6 +267,28 @@ class Os10CliWriter(CliWriter):
     """Dell PowerSwitch OS10. VLAN names are descriptions of 'interface vlan N'."""
 
     show_config_command = "show running-configuration"
+    #: several keys only via a key file in the user's home directory
+    supports_ssh_keys = True
+    KEY_FILE: ClassVar[str] = "cesma_authorized_keys"
+
+    def __init__(
+        self,
+        host: str,
+        credentials: DeviceCredentials,
+        cli_factory: CliFactory | None = None,
+        sftp: SftpUpload = sftp_upload,
+    ) -> None:
+        super().__init__(host, credentials, cli_factory)
+        self._sftp = sftp
+
+    async def push_ssh_keys(self, keys: Sequence[str]) -> int:
+        user = self.credentials.ssh.username
+        if not user:
+            raise WriteError("The credential profile has no SSH user")
+        path = f"/home/{user}/{self.KEY_FILE}"
+        await self._sftp(self.host, self.credentials, path, "".join(f"{k}\n" for k in keys))
+        await self._configure([f"username {user} sshkey filename {path}"])
+        return len(keys)
 
     def render_one(self, op: Operation) -> list[str]:
         match op:
@@ -268,33 +362,6 @@ class RestWriter(ConfigWriter):
     def calls(self, operations: Sequence[Operation], api: str = "") -> list[RestCall]: ...
 
 
-SftpUpload = Callable[
-    [str, DeviceCredentials, str, str], Awaitable[None]
-]  # host, creds, path, text
-
-
-async def sftp_upload(host: str, credentials: DeviceCredentials, path: str, text: str) -> None:
-    import asyncssh
-
-    login = credentials.ssh
-    keys = [asyncssh.import_private_key(login.private_key)] if login.private_key else None
-    try:
-        async with (
-            asyncssh.connect(
-                host,
-                username=login.username,
-                password=login.password,
-                client_keys=keys,
-                known_hosts=None,
-            ) as conn,
-            conn.start_sftp_client() as sftp,
-            sftp.open(path, "w") as remote,
-        ):
-            await remote.write(text)
-    except (OSError, asyncssh.Error) as exc:
-        raise WriteError(f"SFTP upload to {host} failed: {exc}") from exc
-
-
 class ArubaOsRestWriter(RestWriter):
     """HP/Aruba 2530 (ArubaOS-Switch) REST API /rest/vN."""
 
@@ -311,27 +378,37 @@ class ArubaOsRestWriter(RestWriter):
         super().__init__(host, credentials, http_factory)
         self._sftp = sftp
 
-    async def push_ssh_keys(self, keys: Sequence[str]) -> None:
-        """Replace the manager keys (SFTP) and require public key login (REST)."""
+    @staticmethod
+    def ssh_auth(current: dict[str, Any]) -> dict[str, str]:
+        """Public key first; the previous login method (password, RADIUS, TACACS) stays as
+        the second one, so nobody is locked out."""
+        primary = current.get("primary_authentication_method") or "PAM_LOCAL"
+        secondary = current.get("secondary_authentication_method") or "SAM_NONE"
+        if primary != "PAM_PUBLIC_KEY":
+            secondary = {"PAM_RADIUS": "SAM_RADIUS", "PAM_TACACS": "SAM_TACACS"}.get(
+                primary, "SAM_LOCAL"
+            )
+        elif secondary == "SAM_NONE":
+            secondary = "SAM_LOCAL"
+        return {
+            "primary_authentication_method": "PAM_PUBLIC_KEY",
+            "secondary_authentication_method": secondary,
+        }
+
+    async def push_ssh_keys(self, keys: Sequence[str]) -> int:
+        """Replace the manager keys (SFTP) and enable public key login (REST)."""
         content = "".join(f"{key}\n" for key in keys)
         await self._sftp(self.host, self.credentials, self.AUTHORIZED_KEYS, content)
         session = await self._session()
         try:
-            await session.call(
-                RestCall(
-                    "PUT",
-                    "/authentication/ssh",
-                    {
-                        "primary_authentication_method": "PAM_PUBLIC_KEY",
-                        "secondary_authentication_method": "SAM_NONE",
-                    },
-                )
-            )
+            current = await session.call(RestCall("GET", "/authentication/ssh")) or {}
+            await session.call(RestCall("PUT", "/authentication/ssh", self.ssh_auth(current)))
             await session.call(RestCall("POST", "/cli", {"cmd": "write memory"}))
         except HttpError as exc:
             raise WriteError(str(exc)) from exc
         finally:
             await session.logout()
+        return len(keys)
 
     def calls(self, operations: Sequence[Operation], api: str = "") -> list[RestCall]:
         result: list[RestCall] = []
@@ -629,7 +706,7 @@ class ArubaCxRestWriter(RestWriter):
         except CliError as exc:
             raise WriteError(str(exc)) from exc
 
-    async def push_ssh_keys(self, keys: Sequence[str]) -> None:
+    async def push_ssh_keys(self, keys: Sequence[str]) -> int:
         http, api = await self._session()
         try:
             user = quote(self.credentials.api.username or "admin", safe="")
@@ -643,6 +720,7 @@ class ArubaCxRestWriter(RestWriter):
             raise WriteError(str(exc)) from exc
         finally:
             await self._logout(http, api)
+        return len(keys)
 
 
 class SimulatedWriter(ConfigWriter):
@@ -653,6 +731,7 @@ class SimulatedWriter(ConfigWriter):
         self._real = real
         self._config = config
         self.supports_ssh_keys = real.supports_ssh_keys  # type: ignore[misc]
+        self.ssh_keys_own_only = real.ssh_keys_own_only  # type: ignore[misc]
         self.supports_restore = real.supports_restore  # type: ignore[misc]
 
     def render(self, operations: Sequence[Operation]) -> list[str]:
@@ -664,8 +743,8 @@ class SimulatedWriter(ConfigWriter):
     async def running_config(self) -> str:
         return self._config or f"! simulated configuration of {self.host}\n"
 
-    async def push_ssh_keys(self, keys: Sequence[str]) -> None:
-        return None
+    async def push_ssh_keys(self, keys: Sequence[str]) -> int:
+        return len(keys)
 
     async def restore(self, config: str) -> None:
         if not self._real.supports_restore:

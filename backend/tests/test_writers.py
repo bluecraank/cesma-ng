@@ -3,6 +3,7 @@
 import base64
 from dataclasses import replace
 
+import asyncssh
 import pytest
 
 from app.domain.changes import (
@@ -107,6 +108,41 @@ async def _ready(cli: FakeCli) -> FakeCli:
     return cli
 
 
+RSA_KEY = asyncssh.generate_private_key("ssh-rsa", key_size=2048)
+WITH_KEY = replace(
+    CREDS,
+    ssh=replace(CREDS.ssh, private_key=RSA_KEY.export_private_key("openssh").decode()),
+)
+
+
+async def test_dnos_deposits_cesmas_own_rsa_key() -> None:
+    cli = FakeCli()
+    w = DnosCliWriter("sw", WITH_KEY, cli_factory=lambda: _ready(cli))
+    assert w.ssh_keys_own_only
+    assert await w.push_ssh_keys(["ssh-ed25519 AAAA user"]) == 1  # the list does not go there
+    blob = RSA_KEY.export_public_key("openssh").decode().split()[1]
+    assert cli.commands == [
+        "configure",
+        "crypto key pubkey-chain ssh",
+        "user-key admin rsa",
+        f'key-string "{blob}"',
+        "exit",
+        "exit",
+        "ip ssh pubkey-auth",
+        "end",
+        "write memory",
+    ]
+
+
+async def test_dnos_needs_an_rsa_key_in_the_profile() -> None:
+    with pytest.raises(WriteError, match="no private SSH key"):
+        await DnosCliWriter("sw", CREDS).push_ssh_keys([])
+    ed25519 = asyncssh.generate_private_key("ssh-ed25519").export_private_key("openssh").decode()
+    creds = replace(CREDS, ssh=replace(CREDS.ssh, private_key=ed25519))
+    with pytest.raises(WriteError, match="only RSA"):
+        await DnosCliWriter("sw", creds).push_ssh_keys([])
+
+
 # --- Dell OS10 -------------------------------------------------------------------------------
 
 
@@ -126,6 +162,26 @@ def test_os10_render_uses_diff_for_trunks() -> None:
         "exit",
     ]
     assert w.render([DeleteVlan(10)]) == ["no interface vlan 10"]
+
+
+async def test_os10_uploads_key_file_and_references_it() -> None:
+    uploads: list[tuple[str, str]] = []
+
+    async def sftp(host: str, creds: DeviceCredentials, path: str, text: str) -> None:
+        uploads.append((path, text))
+
+    cli = FakeCli()
+    w = Os10CliWriter("sw", CREDS, cli_factory=lambda: _ready(cli), sftp=sftp)
+    assert await w.push_ssh_keys(["ssh-ed25519 AAAA a", "ssh-rsa BBBB b"]) == 2
+    assert uploads == [
+        ("/home/admin/cesma_authorized_keys", "ssh-ed25519 AAAA a\nssh-rsa BBBB b\n")
+    ]
+    assert cli.commands == [
+        "configure",
+        "username admin sshkey filename /home/admin/cesma_authorized_keys",
+        "end",
+        "write memory",
+    ]
 
 
 async def test_os10_backup_uses_os10_command() -> None:
@@ -183,6 +239,50 @@ async def test_arubaos_backup_decodes_cli_output() -> None:
     )
     w = ArubaOsRestWriter("sw", CREDS, http_factory=lambda base: http)
     assert await w.running_config() == config
+
+
+@pytest.mark.parametrize(
+    ("primary", "secondary", "expected"),
+    [
+        ("PAM_LOCAL", "SAM_NONE", "SAM_LOCAL"),  # password stays as second method
+        ("PAM_RADIUS", "SAM_LOCAL", "SAM_RADIUS"),
+        ("PAM_TACACS", "SAM_NONE", "SAM_TACACS"),
+        ("PAM_PUBLIC_KEY", "SAM_NONE", "SAM_LOCAL"),  # earlier Cesma versions: key only
+        ("PAM_PUBLIC_KEY", "SAM_RADIUS", "SAM_RADIUS"),
+    ],
+)
+def test_arubaos_keeps_password_login(primary: str, secondary: str, expected: str) -> None:
+    current = {
+        "primary_authentication_method": primary,
+        "secondary_authentication_method": secondary,
+    }
+    assert ArubaOsRestWriter.ssh_auth(current) == {
+        "primary_authentication_method": "PAM_PUBLIC_KEY",
+        "secondary_authentication_method": expected,
+    }
+
+
+async def test_arubaos_push_uploads_keys_and_sets_auth() -> None:
+    uploads: list[str] = []
+
+    async def sftp(host: str, creds: DeviceCredentials, path: str, text: str) -> None:
+        uploads.append(path)
+
+    http = FakeHttp(
+        {
+            ("GET", "/rest/version"): {"version_element": [{"version": "v7.0"}]},
+            ("POST", "/rest/v7/login-sessions"): {"cookie": "sessionId=abc"},
+            ("GET", "/rest/v7/authentication/ssh"): {
+                "primary_authentication_method": "PAM_LOCAL",
+                "secondary_authentication_method": "SAM_NONE",
+            },
+        }
+    )
+    w = ArubaOsRestWriter("sw", CREDS, http_factory=lambda base: http, sftp=sftp)
+    assert await w.push_ssh_keys(["k1", "k2"]) == 2
+    assert uploads == ["/ssh/mgr_keys/authorized_keys"]
+    put = next(c for c in http.calls if c[0] == "PUT")
+    assert put[2]["secondary_authentication_method"] == "SAM_LOCAL"
 
 
 def test_arubaos_uses_http_when_configured() -> None:
