@@ -685,12 +685,19 @@ class ArubaCxRestWriter(RestWriter):
         except CliError as exc:
             raise WriteError(str(exc)) from exc
 
+    @staticmethod
+    def authorized_keys(keys: Sequence[str]) -> dict[str, str]:
+        """AOS-CX takes the keys as a map index -> key ("1", "2", ...), not as a list."""
+        return {str(index): key for index, key in enumerate(keys, 1)}
+
     async def push_ssh_keys(self, keys: Sequence[str]) -> int:
         http, api = await self._session()
         try:
             user = quote(self.credentials.api.username or "admin", safe="")
             await http.request(
-                "PATCH", f"{api}/system/users/{user}", json={"authorized_keys": list(keys)}
+                "PATCH",
+                f"{api}/system/users/{user}",
+                json={"authorized_keys": self.authorized_keys(keys)},
             )
             await http.request(
                 "PUT", f"{api}/fullconfigs/startup-config?from={api}/fullconfigs/running-config"

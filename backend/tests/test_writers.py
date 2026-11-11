@@ -321,6 +321,19 @@ async def test_arubaos_restore_failure_is_reported() -> None:
         await w.restore("x")
 
 
+async def test_cx_push_sends_keys_as_numbered_map() -> None:
+    http = FakeHttp({("GET", "/rest"): {"latest": {"prefix": "/rest/v10.11"}}})
+    w = ArubaCxRestWriter("sw", CREDS, http_factory=lambda base: http)
+    assert await w.push_ssh_keys(["ssh-ed25519 AAAA a", "ssh-rsa BBBB b"]) == 2
+    patch = next(c for c in http.calls if c[0] == "PATCH")
+    assert patch[1] == "/rest/v10.11/system/users/admin"
+    # a JSON list is rejected by the switch ("Invalid internal type value")
+    assert patch[2] == {"authorized_keys": {"1": "ssh-ed25519 AAAA a", "2": "ssh-rsa BBBB b"}}
+    paths = [p for _, p, _ in http.calls]
+    assert any(p.startswith("/rest/v10.11/fullconfigs/startup-config") for p in paths)
+    assert paths[-1] == "/rest/v10.11/logout"
+
+
 async def test_dell_has_no_restore() -> None:
     with pytest.raises(WriteError, match="not supported"):
         await DnosCliWriter("sw", CREDS).restore("x")

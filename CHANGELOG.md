@@ -8,6 +8,12 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.14.2] - 2026-11-11
+
+### Behoben
+
+- SSH-Schlüssel übertragen auf Aruba CX schlug mit „Invalid internal type value“ fehl: Der Switch erwartet die Schlüssel nummeriert („1“, „2“, …), nicht als Liste
+
 ## [0.14.1] - 2026-11-11
 
 ### Behoben
