@@ -579,6 +579,7 @@ export default {
     fields: { description: 'Beschreibung', enabled: 'Aktiv', untagged: 'Untagged', tagged: 'Tagged' },
   },
   audit: {
+    levels: { info: 'Info', warning: 'Warnung', error: 'Fehler' },
     title: 'Protokoll',
     time: 'Zeit',
     level: 'Stufe',

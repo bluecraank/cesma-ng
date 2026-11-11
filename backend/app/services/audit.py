@@ -32,7 +32,7 @@ async def record(
     db: AsyncSession,
     actor: Actor,
     action: str,
-    message: str = "",
+    message: str = "",  # German display text: frontend/src/utils/auditMessage.ts
     *,
     level: AuditLevel = AuditLevel.INFO,
     site_id: int | None = None,

@@ -8,6 +8,12 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-11
+
+### Geändert
+
+- Protokoll und „Letzte Ereignisse“ auf Deutsch, auch für bereits vorhandene Einträge; Namen, Befehle und technische Fehlermeldungen bleiben wie aufgezeichnet
+
 ## [0.11.0] - 2026-11-10
 
 ### Hinzugefügt

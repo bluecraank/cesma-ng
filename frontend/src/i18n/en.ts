@@ -581,6 +581,7 @@ const en: typeof de = {
     fields: { description: 'Description', enabled: 'Enabled', untagged: 'Untagged', tagged: 'Tagged' },
   },
   audit: {
+    levels: { info: 'Info', warning: 'Warning', error: 'Error' },
     title: 'Audit log',
     time: 'Time',
     level: 'Level',

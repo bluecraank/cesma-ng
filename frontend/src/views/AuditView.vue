@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { api, type AuditEntry, type AuditPage } from '@/api/client'
 import { useNotify } from '@/composables/useNotify'
 import { useSitesStore } from '@/stores/sites'
+import { auditMessage } from '@/utils/auditMessage'
 import { formatDateTime } from '@/utils/format'
 
 const PAGE_SIZE = 50
@@ -91,10 +92,10 @@ function changes(entry: AuditEntry): { key: string; old: string; new: string }[]
           <tbody>
             <tr v-for="e in entries" :key="e.id">
               <td class="whitespace-nowrap tabular-nums">{{ formatDateTime(e.created_at, locale) }}</td>
-              <td><span class="badge" :class="levelBadge[e.level]">{{ e.level }}</span></td>
+              <td><span class="badge" :class="levelBadge[e.level]">{{ t(`audit.levels.${e.level}`) }}</span></td>
               <td class="font-mono text-xs whitespace-nowrap">{{ e.action }}</td>
               <td class="whitespace-nowrap">{{ e.actor_name }}</td>
-              <td class="min-w-48">{{ e.message }}</td>
+              <td class="min-w-48">{{ auditMessage(e, locale) }}</td>
               <td class="text-xs">
                 <div v-for="c in changes(e)" :key="c.key" class="whitespace-nowrap">
                   <span class="text-gray-500 dark:text-gray-400">{{ c.key }}:</span>
