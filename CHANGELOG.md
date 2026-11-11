@@ -8,6 +8,13 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.14.3] - 2026-11-11
+
+### Behoben
+
+- Aruba CX: Das Speichern in die Startkonfiguration (nach Portänderungen, SSH-Schlüsseln und Wiederherstellung) brach nach 30 Sekunden ab; es darf jetzt bis zu 2 Minuten dauern
+- Zeitüberschreitungen bei REST-Aufrufen stehen jetzt als „ReadTimeout“ o. ä. im Protokoll statt einer leeren Meldung
+
 ## [0.14.2] - 2026-11-11
 
 ### Behoben

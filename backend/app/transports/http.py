@@ -20,8 +20,12 @@ class Http(Protocol):
         json: Any = None,
         data: Any = None,
         headers: dict[str, str] | None = None,
+        read_timeout: float | None = None,
     ) -> Any:
-        """Send a request relative to the base URL; returns parsed JSON, text or None."""
+        """Send a request relative to the base URL; returns parsed JSON, text or None.
+
+        ``read_timeout`` overrides the client default for slow calls (e.g. saving the config).
+        """
         ...
 
     async def close(self) -> None: ...
@@ -39,13 +43,20 @@ class HttpxClient:
         json: Any = None,
         data: Any = None,
         headers: dict[str, str] | None = None,
+        read_timeout: float | None = None,
     ) -> Any:
         try:
             response = await self._client.request(
-                method, path, json=json, data=data, headers=headers
+                method,
+                path,
+                json=json,
+                data=data,
+                headers=headers,
+                timeout=read_timeout if read_timeout is not None else httpx.USE_CLIENT_DEFAULT,
             )
         except httpx.HTTPError as exc:
-            raise HttpError(f"{method} {path}: {exc}") from exc
+            # timeouts have no message of their own: name the error type
+            raise HttpError(f"{method} {path}: {type(exc).__name__} {exc}".rstrip()) from exc
         if response.status_code >= 400:
             raise HttpError(
                 f"{method} {path}: HTTP {response.status_code} {response.text[:300]}",
@@ -77,6 +88,7 @@ class FakeHttp:
         json: Any = None,
         data: Any = None,
         headers: dict[str, str] | None = None,
+        read_timeout: float | None = None,
     ) -> Any:
         self.calls.append((method, path, json if json is not None else data))
         return self.responses.get((method, path))

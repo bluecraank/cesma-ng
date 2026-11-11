@@ -624,6 +624,17 @@ class ArubaCxRestWriter(RestWriter):
             raise WriteError(str(exc)) from exc
         return http, api
 
+    #: copying the running to the startup configuration can take a while on AOS-CX
+    SAVE_TIMEOUT: ClassVar[float] = 120
+
+    async def _save(self, http: Http, api: str) -> None:
+        """copy running-config startup-config"""
+        await http.request(
+            "PUT",
+            f"{api}/fullconfigs/startup-config?from={api}/fullconfigs/running-config",
+            read_timeout=self.SAVE_TIMEOUT,
+        )
+
     async def _logout(self, http: Http, api: str) -> None:
         with contextlib.suppress(HttpError):
             await http.request("POST", f"{api}/logout")
@@ -638,9 +649,7 @@ class ArubaCxRestWriter(RestWriter):
                 await http.request(call.method, f"{api}{call.path}", json=call.body)
                 log.append(str(call))
             if calls:
-                await http.request(
-                    "PUT", f"{api}/fullconfigs/startup-config?from={api}/fullconfigs/running-config"
-                )
+                await self._save(http, api)
                 log.append("copy running-config startup-config")
         except HttpError as exc:
             raise WriteError(str(exc)) from exc
@@ -671,9 +680,7 @@ class ArubaCxRestWriter(RestWriter):
         http, api = await self._session()
         try:
             await http.request("PUT", f"{api}/fullconfigs/running-config", json=body)
-            await http.request(
-                "PUT", f"{api}/fullconfigs/startup-config?from={api}/fullconfigs/running-config"
-            )
+            await self._save(http, api)
         except HttpError as exc:
             raise WriteError(str(exc)) from exc
         finally:
@@ -699,9 +706,7 @@ class ArubaCxRestWriter(RestWriter):
                 f"{api}/system/users/{user}",
                 json={"authorized_keys": self.authorized_keys(keys)},
             )
-            await http.request(
-                "PUT", f"{api}/fullconfigs/startup-config?from={api}/fullconfigs/running-config"
-            )
+            await self._save(http, api)
         except HttpError as exc:
             raise WriteError(str(exc)) from exc
         finally:

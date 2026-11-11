@@ -334,6 +334,21 @@ async def test_cx_push_sends_keys_as_numbered_map() -> None:
     assert paths[-1] == "/rest/v10.11/logout"
 
 
+async def test_http_timeout_is_named_in_the_error() -> None:
+    import httpx
+
+    from app.transports.http import HttpError, HttpxClient
+
+    def slow(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("", request=request)
+
+    client = HttpxClient("https://sw", verify_tls=False)
+    client._client = httpx.AsyncClient(base_url="https://sw", transport=httpx.MockTransport(slow))
+    with pytest.raises(HttpError, match=r"PUT /x: ReadTimeout$"):
+        await client.request("PUT", "/x", read_timeout=120)
+    await client.close()
+
+
 async def test_dell_has_no_restore() -> None:
     with pytest.raises(WriteError, match="not supported"):
         await DnosCliWriter("sw", CREDS).restore("x")
