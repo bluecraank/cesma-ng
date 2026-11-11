@@ -6,7 +6,7 @@ from sqlalchemy import update
 from app.auth.authenticators import AuthBackendError, Identity
 from app.core.config import Settings
 from app.models import User
-from app.services.ssh_keys import keys_to_push
+from app.services.ssh_keys import keys_to_push, with_own_key
 from tests.conftest import USERS, grant, user_id
 from tests.test_config_changes import ED25519, RSA, _polled, _port, _simulated_app
 
@@ -96,6 +96,15 @@ async def test_ssh_keys_are_one_shared_list(alice: AsyncClient, bob: AsyncClient
         await db.execute(update(User).where(User.username == "bob").values(is_active=False))
         await db.commit()
     assert await on_switches() == {"alice"}
+
+
+def test_cesmas_own_key_is_always_uploaded() -> None:
+    listed = ["ssh-ed25519 AAAA alice", "ssh-rsa BBBB bob"]
+    # added, so the upload cannot lock Cesma out of switches without password login
+    assert with_own_key(listed, "ssh-rsa CCCC cesma") == [*listed, "ssh-rsa CCCC cesma"]
+    # already in the list (other comment): not twice
+    assert with_own_key(listed, "ssh-rsa BBBB cesma-profile") == listed
+    assert with_own_key(listed, None) == listed
 
 
 class _DirectoryDown:

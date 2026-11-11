@@ -76,6 +76,19 @@ async def delete_key(db: AsyncSession, caller: Caller, key_id: int) -> None:
     await audit.record(db, caller.actor, "ssh_key.delete", f"SSH key {entry.description} deleted")
 
 
+def with_own_key(keys: Sequence[str], own_key: str | None) -> list[str]:
+    """The key list plus Cesma's own public key, unless it is already in it.
+
+    Uploading replaces the keys on the switch; without its own key Cesma would lock itself
+    out of switches that accept no password. Keys are compared by type and data (the
+    comment does not matter).
+    """
+    result = list(keys)
+    if own_key and own_key.split()[:2] not in [k.split()[:2] for k in keys]:
+        result.append(own_key)
+    return result
+
+
 async def keys_to_push(db: AsyncSession) -> list[SshPublicKey]:
     """Keys that belong on every switch: all keys of active users, plus keys without owner
     (imported from cesma-on-premise). Keys of deactivated users are left out."""

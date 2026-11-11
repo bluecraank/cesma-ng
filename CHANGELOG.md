@@ -8,6 +8,12 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.14.4] - 2026-11-11
+
+### Sicherheit
+
+- Beim Übertragen der SSH-Schlüssel schickt Cesma seinen eigenen öffentlichen Schlüssel aus dem Zugangsprofil immer mit. Vorher hätte die erste erfolgreiche Übertragung ihn entfernt, und auf Switches ohne Passwort-Login hätte Cesma sich selbst ausgesperrt
+
 ## [0.14.3] - 2026-11-11
 
 ### Behoben

@@ -24,6 +24,7 @@ from app.models import (
 from app.services import audit, backups, discovery, polling, site_config, ssh_keys
 from app.services.access import require_permission, require_site_access, visible_site_ids
 from app.services.context import Caller, Runtime
+from app.services.credentials import public_key_of
 from app.services.device_access import device_writer
 
 log = logging.getLogger(__name__)
@@ -228,9 +229,13 @@ async def _run_ssh_keys(ctx: JobContext) -> None:
         if not writer.supports_ssh_keys:
             await ctx.say(f"{device.name}: skipped (not supported for this model)", progress)
             continue
+        own_key = public_key_of(writer.credentials.ssh.private_key)
+        device_keys = ssh_keys.with_own_key(keys, own_key)
+        if len(device_keys) > len(keys) and not writer.ssh_keys_own_only:
+            await ctx.say(f"{device.name}: Cesma's own key from the credential profile added")
         try:
             async with asyncio.timeout(APPLY_TIMEOUT):
-                uploaded = await writer.push_ssh_keys(keys)
+                uploaded = await writer.push_ssh_keys(device_keys)
             await audit.record(
                 ctx.db,
                 ctx.caller.actor,
