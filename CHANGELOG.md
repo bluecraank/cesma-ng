@@ -8,6 +8,17 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-11
+
+### Geändert
+
+- SSH-Schlüssel sind jetzt eine gemeinsame Liste: Alle Benutzer sehen alle Schlüssel und tragen ihren eigenen ein, auch ohne Rolle an einem Standort. „SSH-Schlüssel übertragen“ spielt alle Schlüssel der Liste auf die Switches; Schlüssel deaktivierter Benutzer bleiben außen vor
+- Löschen dürfen weiterhin nur der Besitzer und Super-Administratoren
+
+### Entfernt
+
+- Das Recht „SSH-Zugang“ in den Rollen; es wird bei der Aktualisierung aus allen Rollen entfernt
+
 ## [0.12.0] - 2026-11-11
 
 ### Hinzugefügt

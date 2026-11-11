@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Cesma NG",
-    "version": "0.12.0"
+    "version": "0.13.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -2845,41 +2845,19 @@
           "configuration"
         ],
         "summary": "List Keys",
-        "description": "The caller's own keys; ``all_users`` (super administrators) lists everyone's.",
+        "description": "The shared key list (all users' keys).",
         "operationId": "list_keys_api_v1_ssh_keys_get",
-        "parameters": [
-          {
-            "name": "all_users",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "All Users"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/SshKeyOut"
                   },
+                  "type": "array",
                   "title": "Response List Keys Api V1 Ssh Keys Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2893,14 +2871,14 @@
         "summary": "Add Key",
         "operationId": "add_key_api_v1_ssh_keys_post",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SshKeyIn"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "201": {
@@ -6636,8 +6614,7 @@
           "backups.read",
           "backups.restore",
           "console",
-          "ssh_keys.push",
-          "ssh.login"
+          "ssh_keys.push"
         ],
         "title": "Permission",
         "description": "What a role allows on a site, beyond seeing it (every role may see and poll)."

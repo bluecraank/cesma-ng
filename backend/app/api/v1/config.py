@@ -253,9 +253,9 @@ async def get_job(job_id: int, db: Db, caller: CallerDep) -> object:
 
 
 @router.get("/ssh-keys", response_model=list[SshKeyOut])
-async def list_keys(db: Db, caller: CallerDep, all_users: bool = False) -> object:
-    """The caller's own keys; ``all_users`` (super administrators) lists everyone's."""
-    return await ssh_keys.list_keys(db, caller, all_users=all_users)
+async def list_keys(db: Db, caller: CallerDep) -> object:
+    """The shared key list (all users' keys)."""
+    return await ssh_keys.list_keys(db, caller)
 
 
 @router.post("/ssh-keys", response_model=SshKeyOut, status_code=status.HTTP_201_CREATED)

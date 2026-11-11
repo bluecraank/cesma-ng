@@ -1,10 +1,12 @@
-"""Roles with permissions, per-user SSH keys, emergency login and single-VLAN tagging."""
+"""Roles with permissions, the shared SSH key list, emergency login and single-VLAN tagging."""
 
 from httpx import AsyncClient
+from sqlalchemy import update
 
 from app.auth.authenticators import AuthBackendError, Identity
 from app.core.config import Settings
-from app.services.ssh_keys import keys_for_site
+from app.models import User
+from app.services.ssh_keys import keys_to_push
 from tests.conftest import USERS, grant, user_id
 from tests.test_config_changes import ED25519, RSA, _polled, _port, _simulated_app
 
@@ -66,8 +68,8 @@ async def test_roles_are_managed_by_superadmins(alice: AsyncClient, bob: AsyncCl
     ).status_code == 422
 
 
-async def test_ssh_keys_belong_to_users(alice: AsyncClient, bob: AsyncClient, app) -> None:  # type: ignore[no-untyped-def]
-    site = await _site(alice)
+async def test_ssh_keys_are_one_shared_list(alice: AsyncClient, bob: AsyncClient, app) -> None:  # type: ignore[no-untyped-def]
+    # bob has no role on any site and may still add his key
     assert (
         await bob.post("/ssh-keys", json={"description": "bob", "key": ED25519})
     ).status_code == 201
@@ -75,23 +77,25 @@ async def test_ssh_keys_belong_to_users(alice: AsyncClient, bob: AsyncClient, ap
         await alice.post("/ssh-keys", json={"description": "alice", "key": RSA})
     ).status_code == 201
 
-    own = (await bob.get("/ssh-keys")).json()
-    assert [k["description"] for k in own] == ["bob"]
-    assert (await bob.get("/ssh-keys", params={"all_users": True})).status_code == 403
-    everyone = (await alice.get("/ssh-keys", params={"all_users": True})).json()
-    assert {k["owner"] for k in everyone} == {"alice", "bob"}
+    for client in (alice, bob):  # everyone sees every key, with its owner
+        listed = (await client.get("/ssh-keys")).json()
+        assert {(k["description"], k["owner"]) for k in listed} == {
+            ("alice", "alice"),
+            ("bob", "bob"),
+        }
     # nobody deletes other people's keys, except super administrators
-    alice_key = next(k for k in everyone if k["owner"] == "alice")
+    alice_key = next(k for k in listed if k["owner"] == "alice")
     assert (await bob.delete(f"/ssh-keys/{alice_key['id']}")).status_code == 403
 
     async def on_switches() -> set[str]:
         async with app.state.database.sessionmaker() as db:
-            return {k.description for k in await keys_for_site(db, site)}
+            return {k.description for k in await keys_to_push(db)}
 
-    await grant(alice, "bob", {site: "viewer"})  # "Lesen" has no SSH access
-    assert await on_switches() == {"alice"}  # super administrators always
-    await grant(alice, "bob", {site: "admin"})
-    assert await on_switches() == {"alice", "bob"}
+    assert await on_switches() == {"alice", "bob"}  # independent of roles
+    async with app.state.database.sessionmaker() as db:  # deactivated users' keys stay off
+        await db.execute(update(User).where(User.username == "bob").values(is_active=False))
+        await db.commit()
+    assert await on_switches() == {"alice"}
 
 
 class _DirectoryDown:

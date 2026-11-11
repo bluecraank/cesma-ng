@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ArrowUpTrayIcon, PlusIcon, TrashIcon } from '@heroicons/vue/20/solid'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api, type Job, type SshKey } from '@/api/client'
 import UiDialog from '@/components/ui/UiDialog.vue'
@@ -17,16 +17,29 @@ const confirmDelete = useConfirmDelete()
 const { confirm } = useConfirm()
 const sites = useSitesStore()
 const auth = useAuthStore()
-const allUsers = ref(false)
 const { watch: watchJob } = useJobWatcher()
 
 const keys = ref<SshKey[]>([])
 const open = ref(false)
 const form = ref({ description: '', key: '' })
 
+/** Own keys first, then by owner and description. */
+const sorted = computed(() =>
+  [...keys.value].sort(
+    (a, b) =>
+      Number(b.user_id === auth.user?.id) - Number(a.user_id === auth.user?.id) ||
+      (a.owner ?? '').localeCompare(b.owner ?? '') ||
+      a.description.localeCompare(b.description),
+  ),
+)
+
+function canDelete(key: SshKey): boolean {
+  return auth.isSuperadmin || key.user_id === auth.user?.id
+}
+
 async function load(): Promise<void> {
   await notify.run(async () => {
-    keys.value = await api.get<SshKey[]>('/ssh-keys', { all_users: allUsers.value })
+    keys.value = await api.get<SshKey[]>('/ssh-keys')
   })
 }
 
@@ -60,7 +73,6 @@ async function push(): Promise<void> {
 }
 
 onMounted(load)
-watch(allUsers, load)
 </script>
 
 <template>
@@ -71,7 +83,6 @@ watch(allUsers, load)
         <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">{{ t('sshKeys.hint') }}</p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        <label v-if="auth.isSuperadmin" class="flex items-center gap-2 text-sm"><input v-model="allUsers" type="checkbox" class="accent-brand-600" /> {{ t('sshKeys.allUsers') }}</label>
         <button v-if="auth.can('ssh_keys.push', sites.currentId)" type="button" class="btn btn-secondary" @click="push">
           <ArrowUpTrayIcon class="size-4" /> {{ t('sshKeys.push') }}
         </button>
@@ -84,24 +95,26 @@ watch(allUsers, load)
         <thead>
           <tr>
             <th>{{ t('ports.description') }}</th>
-            <th v-if="allUsers">{{ t('sshKeys.owner') }}</th>
+            <th>{{ t('sshKeys.owner') }}</th>
             <th>{{ t('sshKeys.fingerprint') }}</th>
             <th>{{ t('audit.time') }}</th>
             <th class="w-10" />
           </tr>
         </thead>
         <tbody>
-          <tr v-for="k in keys" :key="k.id">
+          <tr v-for="k in sorted" :key="k.id">
             <td class="font-medium text-gray-900 dark:text-white">{{ k.description }}<div class="font-mono text-xs text-gray-500">{{ k.key.split(' ')[0] }}</div></td>
-            <td v-if="allUsers">
-              <span v-if="k.owner">{{ k.owner }}</span>
+            <td>
+              <span v-if="k.owner">{{ k.owner }}<span v-if="k.user_id === auth.user?.id" class="badge badge-brand ml-2">{{ t('sshKeys.yours') }}</span></span>
               <span v-else class="badge badge-yellow" :title="t('sshKeys.noOwnerHint')">{{ t('sshKeys.noOwner') }}</span>
             </td>
             <td class="font-mono text-xs">{{ k.fingerprint }}</td>
             <td class="whitespace-nowrap">{{ formatDateTime(k.created_at, locale) }}</td>
-            <td><button type="button" class="btn-icon hover:!text-red-600" :title="t('common.delete')" @click="remove(k)"><TrashIcon class="size-4" /></button></td>
+            <td>
+              <button v-if="canDelete(k)" type="button" class="btn-icon hover:!text-red-600" :title="t('common.delete')" @click="remove(k)"><TrashIcon class="size-4" /></button>
+            </td>
           </tr>
-          <tr v-if="!keys.length"><td :colspan="allUsers ? 5 : 4" class="py-8 text-center text-gray-500">—</td></tr>
+          <tr v-if="!keys.length"><td colspan="5" class="py-8 text-center text-gray-500">—</td></tr>
         </tbody>
       </table>
     </div>

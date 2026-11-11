@@ -51,7 +51,7 @@ async def enqueue(
         raise ValidationFailedError(f"Unknown job kind {kind}")
     require_permission(caller.user, site_id, JOB_KINDS[kind])
     if kind == "ssh_keys":
-        count = len(await ssh_keys.keys_for_site(db, site_id))
+        count = len(await ssh_keys.keys_to_push(db))
         if count < MIN_SSH_KEYS:
             raise ValidationFailedError(
                 f"At least {MIN_SSH_KEYS} SSH keys are required, so a single wrong key cannot "
@@ -216,8 +216,8 @@ async def _run_backup(ctx: JobContext) -> None:
 
 async def _run_ssh_keys(ctx: JobContext) -> None:
     assert ctx.job.site_id is not None
-    keys = [k.key for k in await ssh_keys.keys_for_site(ctx.db, ctx.job.site_id)]
-    await ctx.say(f"{len(keys)} key(s) of users with SSH access to this site")
+    keys = [k.key for k in await ssh_keys.keys_to_push(ctx.db)]
+    await ctx.say(f"{len(keys)} key(s) from the SSH key list")
     if len(keys) < MIN_SSH_KEYS:
         raise WriteError(f"At least {MIN_SSH_KEYS} SSH keys are required")
     devices = await _devices(ctx)

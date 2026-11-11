@@ -834,7 +834,7 @@ export interface paths {
         };
         /**
          * List Keys
-         * @description The caller's own keys; ``all_users`` (super administrators) lists everyone's.
+         * @description The shared key list (all users' keys).
          */
         get: operations["list_keys_api_v1_ssh_keys_get"];
         put?: never;
@@ -1944,7 +1944,7 @@ export interface components {
          * @description What a role allows on a site, beyond seeing it (every role may see and poll).
          * @enum {string}
          */
-        Permission: "devices.manage" | "ports.edit" | "vlans.manage" | "backups.run" | "backups.read" | "backups.restore" | "console" | "ssh_keys.push" | "ssh.login";
+        Permission: "devices.manage" | "ports.edit" | "vlans.manage" | "backups.run" | "backups.read" | "backups.restore" | "console" | "ssh_keys.push";
         /**
          * PoeStatus
          * @enum {string}
@@ -4464,9 +4464,7 @@ export interface operations {
     };
     list_keys_api_v1_ssh_keys_get: {
         parameters: {
-            query?: {
-                all_users?: boolean;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -4480,15 +4478,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SshKeyOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

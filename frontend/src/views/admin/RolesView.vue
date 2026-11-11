@@ -11,7 +11,7 @@ import { useNotify } from '@/composables/useNotify'
 const GROUPS: { key: string; permissions: Permission[] }[] = [
   { key: 'devices', permissions: ['devices.manage', 'ports.edit', 'vlans.manage'] },
   { key: 'backups', permissions: ['backups.run', 'backups.read', 'backups.restore'] },
-  { key: 'access', permissions: ['console', 'ssh_keys.push', 'ssh.login'] },
+  { key: 'access', permissions: ['console', 'ssh_keys.push'] },
 ]
 
 const { t } = useI18n()

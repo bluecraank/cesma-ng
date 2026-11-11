@@ -19,8 +19,7 @@ class Permission(StrEnum):
     BACKUPS_READ = "backups.read"  # download and compare (contains switch secrets)
     BACKUPS_RESTORE = "backups.restore"
     CONSOLE = "console"  # read-only commands on the switch
-    SSH_KEYS_PUSH = "ssh_keys.push"  # upload SSH keys to the switches
-    SSH_LOGIN = "ssh.login"  # the user's own SSH keys are uploaded to the switches
+    SSH_KEYS_PUSH = "ssh_keys.push"  # upload the SSH key list to the switches
 
 
 class BuiltinRole(StrEnum):
