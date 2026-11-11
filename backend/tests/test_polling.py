@@ -64,6 +64,19 @@ async def test_full_poll_of_hp_switch(alice: AsyncClient, app, settings: Setting
     assert all(s["failures"] == 0 for s in states)
 
 
+async def test_full_poll_of_aruba_cx(alice: AsyncClient, app, settings: Settings) -> None:  # type: ignore[no-untyped-def]
+    settings = settings.model_copy(update={"snmp_simulator_dir": str(FIXTURES)})
+    device_id = await _device(alice, "aruba-cx-6100", "aruba_cx")
+    await _poll_all(app, device_id, settings)
+
+    device = (await alice.get(f"/devices/{device_id}")).json()
+    assert device["status"] == "online" and device["firmware"] == "PL.10.11.0001"
+    ports = {p["name"]: p for p in (await alice.get(f"/devices/{device_id}/ports")).json()}
+    assert len(ports) == 52
+    assert ports["1/1/52"]["is_uplink"] and not ports["1/1/1"]["is_uplink"]
+    assert len((await alice.get(f"/devices/{device_id}/vlans")).json()) == 33
+
+
 async def test_second_poll_keeps_port_ids(alice: AsyncClient, app, settings: Settings) -> None:  # type: ignore[no-untyped-def]
     settings = settings.model_copy(update={"snmp_simulator_dir": str(FIXTURES)})
     device_id = await _device(alice, "dell-n1548p", "dell_n1500")

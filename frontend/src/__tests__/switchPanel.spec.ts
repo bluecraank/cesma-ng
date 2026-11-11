@@ -31,6 +31,15 @@ describe('panelLayout', () => {
     expect(names(units[1]!.blocks[0]!.columns[1]!)).toEqual(['Gi2/0/3', 'Gi2/0/4'])
   })
 
+  it('handles AOS-CX names (member/slot/port) including stacks', () => {
+    const list = [...Array.from({ length: 52 }, (_, i) => `1/1/${i + 1}`), '2/1/1', '2/1/2']
+    const units = panelLayout(ports(list))
+    expect(units.map((u) => u.unit)).toEqual(['1', '2'])
+    expect(units[0]!.blocks.map((b) => b.columns.length)).toEqual([24, 2])
+    expect(names(units[0]!.blocks[1]!.columns[1]!)).toEqual(['1/1/51', '1/1/52'])
+    expect(portLabel('1/1/52')).toBe('52')
+  })
+
   it('leaves gaps for missing port numbers', () => {
     const [unit] = panelLayout(ports(['1', '2', '4']))
     expect(unit!.blocks[0]!.columns.map(names)).toEqual([

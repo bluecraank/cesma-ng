@@ -99,16 +99,7 @@ class SnmpSwitchDriver:
         system = await self.read_system()
         interfaces = await self._interfaces()
         bridge_ports = await self._bridge_ports()
-        q_rows = await self._walk_all(
-            mib.DOT1Q_STATIC_NAME,
-            mib.DOT1Q_STATIC_EGRESS,
-            mib.DOT1Q_STATIC_UNTAGGED,
-            mib.DOT1Q_PVID,
-        )
-        if not column(q_rows, mib.DOT1Q_STATIC_EGRESS):  # no static table: use current
-            q_rows.update(
-                await self._walk_all(mib.DOT1Q_CURRENT_EGRESS, mib.DOT1Q_CURRENT_UNTAGGED)
-            )
+        q_rows = await self._vlan_rows()
         vlan_table = mib.parse_vlans(q_rows, bridge_ports)
         pvids = mib.parse_pvids(q_rows, bridge_ports)
         poe_rows = await self._walk_all(mib.PETH_PORT_ADMIN, mib.PETH_PORT_DETECTION)
@@ -120,6 +111,18 @@ class SnmpSwitchDriver:
             for vid in sorted(vlan_table.names)
         ]
         return Inventory(system=system, ports=ports, vlans=vlans)
+
+    async def _vlan_rows(self) -> dict[Oid, SnmpValue]:
+        """VLAN names, memberships and PVIDs as Q-BRIDGE-MIB rows."""
+        rows = await self._walk_all(
+            mib.DOT1Q_STATIC_NAME,
+            mib.DOT1Q_STATIC_EGRESS,
+            mib.DOT1Q_STATIC_UNTAGGED,
+            mib.DOT1Q_PVID,
+        )
+        if not column(rows, mib.DOT1Q_STATIC_EGRESS):  # no static table: use current
+            rows.update(await self._walk_all(mib.DOT1Q_CURRENT_EGRESS, mib.DOT1Q_CURRENT_UNTAGGED))
+        return rows
 
     def _build_ports(
         self,

@@ -41,6 +41,12 @@ DOT1Q_STATIC_EGRESS = "1.3.6.1.2.1.17.7.1.4.3.1.2"
 DOT1Q_STATIC_UNTAGGED = "1.3.6.1.2.1.17.7.1.4.3.1.4"
 DOT1Q_PVID = "1.3.6.1.2.1.17.7.1.4.5.1.1"
 
+# IEEE8021-Q-BRIDGE-MIB: same tables with a component id in front of the index (AOS-CX).
+IEEE_Q_STATIC_NAME = "1.3.111.2.802.1.1.4.1.4.3.1.3"  # index: component, vid
+IEEE_Q_STATIC_EGRESS = "1.3.111.2.802.1.1.4.1.4.3.1.4"
+IEEE_Q_STATIC_UNTAGGED = "1.3.111.2.802.1.1.4.1.4.3.1.6"
+IEEE_Q_PVID = "1.3.111.2.802.1.1.4.1.4.5.1.1"  # index: component, bridge port
+
 ENT_PHYSICAL = "1.3.6.1.2.1.47.1.1.1.1"
 ENT_CLASS, ENT_SOFTWARE_REV, ENT_SERIAL, ENT_MODEL = (
     f"{ENT_PHYSICAL}.{c}" for c in (5, 10, 11, 13)

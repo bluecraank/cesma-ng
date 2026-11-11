@@ -8,6 +8,16 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-11
+
+### Hinzugefügt
+
+- Aruba CX (AOS-CX): VLANs mit Namen, untagged/tagged je Port und native VLAN werden jetzt gelesen; mit einem Mitschnitt eines Aruba 6100 geprüft (Ports, VLANs, MAC-Tabelle, LLDP, ARP, Uplinks)
+
+### Sicherheit
+
+- Die Anonymisierung von Mitschnitten ersetzt den Hostnamen auch in der Systembeschreibung (bei AOS-CX identisch)
+
 ## [0.11.2] - 2026-11-11
 
 ### Geändert

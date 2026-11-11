@@ -29,6 +29,7 @@ def _port(inventory: Inventory, name: str) -> Port:
         ("dell-os10", DeviceModel.DELL_OS10, "S5248F-ON", "10.5.6.8"),
         ("hp-2530-48g", DeviceModel.ARUBA_OS_SWITCH, "J9775A", "YA.16.11.0008"),
         ("aruba-2930f", DeviceModel.ARUBA_OS_SWITCH, "JL254A", "WC.16.11.0008"),
+        ("aruba-cx-6100", DeviceModel.ARUBA_CX, "JL676A", "PL.10.11.0001"),
     ],
 )
 async def test_model_detection_and_system_info(
@@ -169,6 +170,35 @@ async def test_2930f_fdb_and_lldp() -> None:
     neighbors = await driver.read_lldp()
     assert len(neighbors) == 18 and all(n.local_if_index in names for n in neighbors)
     assert {n.local_port_name for n in neighbors} >= {"51", "52"}  # the trunk members
+
+
+# --- Aruba CX 6100 (AOS-CX) ------------------------------------------------------------------
+
+
+async def test_cx_ports_and_vlans_from_ieee_q_bridge() -> None:
+    inv = await (await _driver("aruba-cx-6100")).read_inventory()
+    assert [p.name for p in inv.ports[:2]] == ["1/1/1", "1/1/2"] and len(inv.ports) == 52
+    assert all(p.kind is PortKind.ETHERNET for p in inv.ports)  # vlan1, vlan502 are no ports
+    assert len(inv.vlans) == 33
+    # static table: exactly one untagged VLAN per port, matching the PVID
+    assert all(p.untagged_vlans == {p.pvid} for p in inv.ports)
+    access = _port(inv, "1/1/1")
+    assert access.pvid == 580 and access.tagged_vlans == {581, 582, 584, 590, 592}
+    uplink = _port(inv, "1/1/52")
+    assert uplink.oper_up and uplink.speed_mbps == 10000
+    assert uplink.untagged_vlans == {1} and len(uplink.tagged_vlans) == 32
+
+
+async def test_cx_fdb_lldp_and_arp() -> None:
+    driver = await _driver("aruba-cx-6100")
+    inventory = await driver.read_inventory()
+    names = {p.if_index: p.name for p in inventory.ports}
+    fdb = await driver.read_fdb()
+    assert len(fdb) == 611 and {e.vid for e in fdb} <= {v.vid for v in inventory.vlans}
+    assert sum(names.get(e.if_index or 0) == "1/1/52" for e in fdb) == 560
+    neighbors = await driver.read_lldp()
+    assert len(neighbors) == 8 and all(n.local_if_index in names for n in neighbors)
+    assert len(await driver.read_arp()) == 6
 
 
 # --- MIB helpers -----------------------------------------------------------------------------

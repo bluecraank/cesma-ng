@@ -41,6 +41,9 @@ KEEP = [
     *(f"1.3.6.1.2.1.17.7.1.4.2.1.{c}" for c in (3, 4, 5)),
     *(f"1.3.6.1.2.1.17.7.1.4.3.1.{c}" for c in (1, 2, 4)),
     "1.3.6.1.2.1.17.7.1.4.5.1.1",
+    # IEEE8021-Q-BRIDGE-MIB (AOS-CX): static VLAN name, egress, untagged; PVID
+    *(f"1.3.111.2.802.1.1.4.1.4.3.1.{c}" for c in (3, 4, 6)),
+    "1.3.111.2.802.1.1.4.1.4.5.1.1",
     *(f"1.3.6.1.2.1.47.1.1.1.1.{c}" for c in (2, 4, 5, 7, 10, 11, 13)),
     *(f"1.3.6.1.2.1.105.1.1.1.{c}" for c in (3, 6, 10)),
     *(f"1.3.6.1.2.1.105.1.3.1.1.{c}" for c in (2, 4, 5)),
@@ -54,6 +57,8 @@ KEEP = [
     "1.3.6.1.2.1.4.35.1.4",
 ]
 KEEP_OIDS = [tuple(map(int, p.split("."))) for p in KEEP]
+SYS_DESCR = (1, 3, 6, 1, 2, 1, 1, 1, 0)
+SYS_NAME = (1, 3, 6, 1, 2, 1, 1, 5, 0)
 PRINTABLE = set(string.printable.encode()) - set(b"|\r\n\t\x0b\x0c")
 SALT = os.urandom(16)
 
@@ -145,7 +150,7 @@ def transform(
         value = text(lambda v: ps.name(v, "switch"))
     elif starts(o, "1.3.6.1.2.1.31.1.1.1.18"):
         value = text(lambda v: f"desc-{o[-1]}" if v.strip() else v)
-    elif starts(o, "1.3.6.1.2.1.17.7.1.4.3.1.1"):
+    elif starts(o, "1.3.6.1.2.1.17.7.1.4.3.1.1") or starts(o, "1.3.111.2.802.1.1.4.1.4.3.1.3"):
         value = text(
             lambda v: (
                 v
@@ -196,12 +201,18 @@ def main() -> None:
             text_oid, tag, value = line.split("|", 2)
             rows.append((oid(text_oid), tag, value))
         rows.sort()  # subtype columns (4, 6) come before the values (5, 7)
+        # AOS-CX may report the host name as sysDescr: replace it there as well
+        sys_name = next((decode(t, v) for o, t, v in rows if o == SYS_NAME), b"")
+        sys_name = sys_name.decode(errors="replace") if isinstance(sys_name, bytes) else sys_name
         lldp_subtypes: dict[Oid, int] = {}
         result: dict[Oid, tuple[str, str]] = {}
         for o, tag, value in rows:
             if not any(o[: len(k)] == k for k in KEEP_OIDS):
                 continue
             new_oid, new_value = transform(o, tag, decode(tag, value), ps, lldp_subtypes)
+            if o == SYS_DESCR and sys_name.strip() and isinstance(new_value, bytes):
+                pseudonym = ps.name(sys_name, "switch")
+                new_value = new_value.decode(errors="replace").replace(sys_name, pseudonym).encode()
             result[new_oid] = encode(tag, new_value)
         target = args.out / path.name
         with target.open("w", encoding="utf-8", newline="\n") as fh:
