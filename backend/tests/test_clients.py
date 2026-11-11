@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -10,8 +8,8 @@ from app.models import Client, MacType, PollTask
 from app.services import clients
 from app.services.polling import driver_factory_for, poll_device
 from app.services.uplinks import uplink_port_ids
-
-FIXTURES = Path(__file__).parent / "fixtures" / "snmp"
+from tests.conftest import RECORDINGS as FIXTURES
+from tests.conftest import recording
 
 
 @pytest.mark.parametrize(
@@ -62,6 +60,7 @@ def test_parse_ieee_oui_csv() -> None:
 async def _polled_switch(
     alice: AsyncClient, app, settings: Settings, hostname: str, model: str
 ) -> int:  # type: ignore[no-untyped-def]
+    recording(hostname)
     sites = (await alice.get("/sites")).json()
     site = (
         sites[0]["id"] if sites else (await alice.post("/sites", json={"name": "HQ"})).json()["id"]

@@ -12,6 +12,18 @@ from app.services.users import ensure_builtin_roles
 USERS = {"alice": "pw-alice", "bob": "pw-bob", "carol": "pw-carol"}
 HEADERS = {"X-Requested-With": "cesma"}
 
+#: Anonymised switch recordings. They stay local and are not part of the repository, so tests
+#: that need one are skipped where it is missing (e.g. in CI).
+RECORDINGS = Path(__file__).parent / "fixtures" / "snmp"
+
+
+def recording(name: str) -> Path:
+    """Path of the recording ``<name>.snmprec``; skips the calling test if it is not there."""
+    path = RECORDINGS / f"{name}.snmprec"
+    if not path.is_file():
+        pytest.skip(f"recording {path.name} not available (kept locally, not in the repository)")
+    return path
+
 
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:

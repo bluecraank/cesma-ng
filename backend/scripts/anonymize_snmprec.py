@@ -2,10 +2,14 @@
 
     python scripts/anonymize_snmprec.py ../mitschnitte/*.snmprec --out tests/fixtures/snmp
 
+The fixtures stay local as well (tests/fixtures/snmp is git-ignored); tests that need one are
+skipped where it is missing.
+
 Keeps only the columns Cesma reads and replaces, consistently across all input files:
 MAC addresses (vendor prefix kept), IPv4 addresses (/24 structure kept), host and system
-names, port descriptions, VLAN names and serial numbers. MACs and IPs are also replaced
-where they are part of a table index (forwarding database, ARP, LLDP management address).
+names, port descriptions (own and LLDP neighbours'), VLAN names and serial numbers. MACs
+and IPs are also replaced where they are part of a table index (forwarding database, ARP,
+LLDP management address).
 The salt is random per run, so the mapping cannot be reproduced from the fixtures.
 """
 
@@ -153,6 +157,8 @@ def transform(
         value = text(lambda v: f"SERIAL{o[-1]}" if v.strip() else v)
     elif starts(o, "1.0.8802.1.1.2.1.4.1.1.9"):
         value = text(lambda v: ps.name(v, "neighbor"))
+    elif starts(o, "1.0.8802.1.1.2.1.4.1.1.8"):  # neighbour's port description: free text
+        value = text(lambda v: ps.name(v, "remote-port"))
     elif starts(o, "1.0.8802.1.1.2.1.4.1.1.4"):
         lldp_subtypes[("chassis", *o[-3:])] = int(value)  # type: ignore[arg-type]
     elif starts(o, "1.0.8802.1.1.2.1.4.1.1.6"):

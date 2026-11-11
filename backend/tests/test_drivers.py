@@ -1,6 +1,4 @@
-"""Drivers against anonymised recordings of real switches (tests/fixtures/snmp)."""
-
-from pathlib import Path
+"""Drivers against anonymised recordings of real switches (tests/fixtures/snmp, kept locally)."""
 
 import pytest
 
@@ -10,12 +8,11 @@ from app.drivers.base import SnmpSwitchDriver
 from app.drivers.registry import detect, driver_for
 from app.models import DeviceModel
 from app.transports.snmp import RecordedSnmpClient
-
-FIXTURES = Path(__file__).parent / "fixtures" / "snmp"
+from tests.conftest import recording
 
 
 async def _driver(name: str) -> SnmpSwitchDriver:
-    client = RecordedSnmpClient.from_file(FIXTURES / f"{name}.snmprec")
+    client = RecordedSnmpClient.from_file(recording(name))
     detection = await detect(client)
     assert detection.model is not None
     return driver_for(detection.model, client)
@@ -31,6 +28,7 @@ def _port(inventory: Inventory, name: str) -> Port:
         ("dell-n1548p", DeviceModel.DELL_N1500, "N1548P", "6.8.1.0"),
         ("dell-os10", DeviceModel.DELL_OS10, "S5248F-ON", "10.5.6.8"),
         ("hp-2530-48g", DeviceModel.ARUBA_OS_SWITCH, "J9775A", "YA.16.11.0008"),
+        ("aruba-2930f", DeviceModel.ARUBA_OS_SWITCH, "JL254A", "WC.16.11.0008"),
     ],
 )
 async def test_model_detection_and_system_info(
@@ -144,6 +142,33 @@ async def test_hp2530_lldp_neighbors() -> None:
     assert phone.system_description.startswith("Mitel 6920")
     assert phone.chassis_id == phone.management_address  # chassis id subtype "network address"
     assert len(phone.port_id) == 17  # port id subtype "MAC address"
+
+
+# --- Aruba 2930F (ArubaOS-Switch, same driver as the 2530) -----------------------------------
+
+
+async def test_2930f_ports_trunk_and_vlans() -> None:
+    inv = await (await _driver("aruba-2930f")).read_inventory()
+    assert len(inv.ports) == 53 and [p.name for p in inv.ports[-3:]] == ["51", "52", "Trk1"]
+    trk = _port(inv, "Trk1")  # 2 x 10G SFP+ (ports 51, 52)
+    assert trk.kind is PortKind.LAG and trk.oper_up and trk.speed_mbps == 20000
+    assert len(trk.tagged_vlans) == 22 and trk.untagged_vlans == {1}
+    assert _port(inv, "51").speed_mbps == 10000
+    assert len(inv.vlans) == 30
+    assert all(p.pvid in p.untagged_vlans for p in inv.ports if p.kind is PortKind.ETHERNET)
+    assert all(p.poe is None for p in inv.ports)  # JL254A has no PoE
+
+
+async def test_2930f_fdb_and_lldp() -> None:
+    driver = await _driver("aruba-2930f")
+    inventory = await driver.read_inventory()
+    names = {p.if_index: p.name for p in inventory.ports}
+    fdb = await driver.read_fdb()
+    assert len(fdb) == 673 and {e.vid for e in fdb} <= {v.vid for v in inventory.vlans}
+    assert sum(names[e.if_index] == "Trk1" for e in fdb if e.if_index) == 641
+    neighbors = await driver.read_lldp()
+    assert len(neighbors) == 18 and all(n.local_if_index in names for n in neighbors)
+    assert {n.local_port_name for n in neighbors} >= {"51", "52"}  # the trunk members
 
 
 # --- MIB helpers -----------------------------------------------------------------------------

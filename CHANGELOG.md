@@ -8,6 +8,17 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-11-11
+
+### Geändert
+
+- Aruba 2930F (ArubaOS-Switch) mit einem echten Mitschnitt geprüft: Erkennung, Ports, Trunk, VLANs, MAC-Tabelle und LLDP werden vollständig gelesen
+
+### Sicherheit
+
+- Switch-Mitschnitte werden nicht mehr im Repository veröffentlicht, auch nicht anonymisiert; sie liegen nur lokal
+- Die Anonymisierung ersetzt jetzt auch die Portbeschreibungen von LLDP-Nachbarn
+
 ## [0.11.1] - 2026-11-11
 
 ### Geändert

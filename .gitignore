@@ -22,5 +22,6 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
-# Switch captures with internal data (IPs, MACs, names) - not committed until anonymised
+# Switch recordings stay local: raw captures (internal IPs, MACs, names) and anonymised fixtures
 mitschnitte/
+backend/tests/fixtures/snmp/

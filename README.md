@@ -14,7 +14,7 @@ cesma-ng ist eine webbasierte Verwaltung für Netzwerk-Switches. Sie ist eine ko
 Das Modell wird beim Anlegen über die sysObjectID erkannt (Knopf „Erkennen“).
 
 **Getestet:**
-- Die Lese-Treiber sind gegen anonymisierte Mitschnitte echter Switches getestet (`backend/tests/fixtures/snmp`).
+- Die Lese-Treiber sind gegen anonymisierte Mitschnitte echter Switches getestet. Die Mitschnitte liegen nur lokal und nicht im Repository.
 - Die Schreib-Befehle sind durch Golden-Tests festgelegt (`tests/test_writers.py`).
 - An echter Hardware sind sie noch nicht abgenommen.
 - Für die Aruba CX gibt es noch keinen Mitschnitt.
@@ -176,7 +176,7 @@ CESMA_SNMP_SIMULATOR_DIR=tests/fixtures/snmp .venv/Scripts/python -m app.jobs.wo
 cd frontend && npm install && npm run dev    # http://localhost:5173
 ```
 
-- **Simulator:** Mit `CESMA_SNMP_SIMULATOR_DIR` werden Geräte, deren Hostname einem Mitschnitt entspricht, aus dem Mitschnitt beantwortet: `dell-n1548p`, `dell-os10`, `hp-2530-48g`. Änderungen an diesen Geräten werden nur angezeigt, nie gesendet.
+- **Simulator:** Mit `CESMA_SNMP_SIMULATOR_DIR` werden Geräte, deren Hostname einem Mitschnitt in diesem Ordner entspricht (z. B. `hp-2530-48g` für `hp-2530-48g.snmprec`), aus dem Mitschnitt beantwortet. Die Mitschnitte liegen nur lokal (siehe unten). Änderungen an diesen Geräten werden nur angezeigt, nie gesendet.
 - **In Produktion gesperrt:** sowohl der Simulator als auch das Dev-Login.
 
 **Prüfungen** (dieselben wie in der CI):
@@ -192,10 +192,11 @@ cd frontend && npm install && npm run dev    # http://localhost:5173
 cd backend && python scripts/export_openapi.py && cd ../frontend && npm run gen:api
 ```
 
-**Neue Mitschnitte:**
-- `backend/scripts/snmp_record.py` zeichnet einen Switch auf, nur lesend.
-- `backend/scripts/anonymize_snmprec.py` macht daraus Test-Fixtures, ohne Namen, MACs, IPs oder Seriennummern.
-- Die Rohdaten (`mitschnitte/`) werden nicht eingecheckt.
+**Mitschnitte:**
+- `backend/scripts/snmp_record.py` zeichnet einen Switch auf, nur lesend, standardmäßig nach `mitschnitte/`.
+- `backend/scripts/anonymize_snmprec.py` macht daraus Test-Fixtures, ohne Namen, MACs, IPs oder Seriennummern, in `backend/tests/fixtures/snmp/`.
+- Weder Rohdaten noch anonymisierte Fassungen werden eingecheckt, beide Ordner sind in `.gitignore`.
+- Tests, die einen Mitschnitt brauchen, werden übersprungen, wenn er fehlt. In der CI laufen sie deshalb nicht, nur lokal.
 
 **Versionierung:**
 - [Semantic Versioning](https://semver.org/lang/de/) und [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).

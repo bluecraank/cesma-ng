@@ -8,15 +8,14 @@ from app.core.config import Settings
 from app.models import Device, DeviceStatus, DiscoveredHost
 from app.services import discovery
 from app.services.context import Runtime
-
-FIXTURES = Path(__file__).parent / "fixtures" / "snmp"
+from tests.conftest import recording
 
 
 async def test_range_scan_finds_switch_once(
     alice: AsyncClient, app, settings: Settings, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
     # simulator: the HP recording answers as 192.0.2.10; 192.0.2.9 does not exist (TEST-NET)
-    shutil.copy(FIXTURES / "hp-2530-48g.snmprec", tmp_path / "192.0.2.10.snmprec")
+    shutil.copy(recording("hp-2530-48g"), tmp_path / "192.0.2.10.snmprec")
     settings = settings.model_copy(update={"snmp_simulator_dir": str(tmp_path)})
     runtime = Runtime(settings, app.state.secret_box)
     site = (await alice.post("/sites", json={"name": "HQ"})).json()["id"]

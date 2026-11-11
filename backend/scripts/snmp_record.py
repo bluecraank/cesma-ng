@@ -1,4 +1,6 @@
-"""Record the SNMP data of a switch into an ``.snmprec`` file (test fixture / snmpsim input).
+"""Record the SNMP data of a switch into an ``.snmprec`` file (raw input for test fixtures).
+
+The output contains internal data and is never committed; see anonymize_snmprec.py.
 
 Only reads (GETBULK), never writes. Example:
 
@@ -195,9 +197,8 @@ def main() -> None:
     p.add_argument("--timeout", type=float, default=3.0)
     p.add_argument("--retries", type=int, default=2)
     p.add_argument("--no-vendor", action="store_true", help="skip the enterprise subtrees")
-    p.add_argument(
-        "--out", default=str(Path(__file__).parent.parent / "tests" / "fixtures" / "snmp")
-    )
+    # raw recordings contain internal data: keep them out of the source tree by default
+    p.add_argument("--out", default="mitschnitte", help="folder (default: ./mitschnitte)")
     args = p.parse_args()
     print(f"Recording {args.host} ...")
     try:

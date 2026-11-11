@@ -1,7 +1,5 @@
 """Port changes, site VLANs + sync, jobs, backups and SSH keys (simulator mode, no network)."""
 
-from pathlib import Path
-
 from httpx import AsyncClient
 
 from app.core.config import Settings
@@ -9,9 +7,9 @@ from app.models import Job, PollTask
 from app.services import jobs
 from app.services.context import Runtime
 from app.services.polling import driver_factory_for, poll_device
-from tests.conftest import grant
+from tests.conftest import RECORDINGS as FIXTURES
+from tests.conftest import grant, recording
 
-FIXTURES = Path(__file__).parent / "fixtures" / "snmp"
 ED25519 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
 RSA = (
     "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQC7vbqajDhA4zUxGdE7ftvEhdXzW1Npt7WqYi0ex1d7"
@@ -27,6 +25,7 @@ async def _simulated_app(app, settings: Settings) -> Settings:  # type: ignore[n
 
 
 async def _polled(alice: AsyncClient, app, settings: Settings, hostname: str, model: str) -> int:  # type: ignore[no-untyped-def]
+    recording(hostname)
     sites = (await alice.get("/sites")).json()
     site = (
         sites[0]["id"] if sites else (await alice.post("/sites", json={"name": "HQ"})).json()["id"]

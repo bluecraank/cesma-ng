@@ -1,7 +1,5 @@
 """Polling pipeline: recording -> driver -> database -> API."""
 
-from pathlib import Path
-
 from httpx import AsyncClient
 from sqlalchemy import select
 
@@ -11,11 +9,13 @@ from app.drivers.base import SnmpSwitchDriver
 from app.models import Device, DevicePollState, PollTask
 from app.services.polling import driver_factory_for, due_tasks, poll_device
 from app.transports.snmp import SnmpError
+from tests.conftest import RECORDINGS as FIXTURES
+from tests.conftest import recording
 
-FIXTURES = Path(__file__).parent / "fixtures" / "snmp"
 
-
-async def _device(alice: AsyncClient, hostname: str, model: str) -> int:
+async def _device(alice: AsyncClient, hostname: str, model: str, *, recorded: bool = True) -> int:
+    if recorded:
+        recording(hostname)
     site = (await alice.post("/sites", json={"name": "HQ"})).json()["id"]
     body = {"name": hostname, "hostname": hostname, "model": model, "site_id": site}
     return int((await alice.post("/devices", json=body)).json()["id"])
@@ -86,7 +86,7 @@ class _Unreachable:
 async def test_device_goes_offline_and_notifies(
     alice: AsyncClient, app, settings: Settings
 ) -> None:  # type: ignore[no-untyped-def]
-    device_id = await _device(alice, "10.0.0.99", "dell_os10")
+    device_id = await _device(alice, "10.0.0.99", "dell_os10", recorded=False)
     for _ in range(2):
         async with app.state.database.sessionmaker() as db:
             ok = await poll_device(
@@ -127,6 +127,7 @@ async def test_refresh_makes_tasks_due(alice: AsyncClient, app, settings: Settin
 
 
 async def test_detect_uses_recording(alice: AsyncClient, app) -> None:  # type: ignore[no-untyped-def]
+    recording("dell-n1548p")
     app.state.settings = app.state.settings.model_copy(update={"snmp_simulator_dir": str(FIXTURES)})
     r = await alice.post("/devices/detect", json={"hostname": "dell-n1548p"})
     assert r.status_code == 200, r.text
