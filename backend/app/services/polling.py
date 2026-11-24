@@ -135,7 +135,7 @@ async def poll_device(
         await addresses.refresh(device)
         await db.commit()
     state = await get_state(db, device_id, task)
-    credentials = to_device_credentials(await _profile(db, device), box)
+    credentials = to_device_credentials(await _profile(db, device), box, device)
     driver = driver_factory(device, credentials)
 
     started = time.monotonic()

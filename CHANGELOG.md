@@ -8,6 +8,12 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-17
+
+### Hinzugefügt
+
+- Eigene API-Zugangsdaten pro Switch (HP/Aruba): Im Gerätedialog lassen sich API-Benutzer und -Passwort direkt am Switch hinterlegen. Sie haben Vorrang vor dem Zugangsprofil, das weiterhin SNMP und SSH liefert – für Switches mit individuellen Passwörtern ist so kein eigenes Profil pro Gerät mehr nötig. Ein leeres Feld übernimmt den Wert aus dem Profil. Setzen dürfen das nur Super-Administratoren; das Passwort wird verschlüsselt gespeichert und nie angezeigt oder protokolliert
+
 ## [0.14.6] - 2026-11-11
 
 ### Behoben

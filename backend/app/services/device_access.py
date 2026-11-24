@@ -15,5 +15,5 @@ async def device_writer(db: AsyncSession, runtime: Runtime, device: Device) -> C
         if device.credential_profile_id
         else None
     )
-    credentials = to_device_credentials(profile, runtime.box)
+    credentials = to_device_credentials(profile, runtime.box, device)
     return polling.config_writer(runtime.settings, device, credentials)

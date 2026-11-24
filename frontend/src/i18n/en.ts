@@ -108,6 +108,12 @@ const en: typeof de = {
     uptime: 'Uptime',
     location: 'Location note',
     credentials: 'Credential profile',
+    ownApiLogin: 'Own API login',
+    ownApiLoginHint: 'HP/Aruba only (REST API). Empty fields use the values of the credential profile.',
+    apiUsername: 'API user',
+    apiPassword: 'API password',
+    fromProfile: 'from the credential profile',
+    clearApiPassword: 'Remove own password',
     details: 'Details',
     models: {
       dell_n1500: 'Dell N1500 (DNOS 6)',

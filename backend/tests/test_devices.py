@@ -81,3 +81,63 @@ async def test_enums_are_stored_by_value(alice: AsyncClient, app) -> None:  # ty
     async with app.state.database.engine.connect() as conn:
         row = (await conn.exec_driver_sql("SELECT model, status FROM devices")).one()
     assert tuple(row) == ("aruba_cx", "unknown")
+
+
+async def test_device_own_api_login_overrides_profile(alice: AsyncClient, app) -> None:  # type: ignore[no-untyped-def]
+    from app.models import CredentialProfile, Device
+    from app.services.credentials import to_device_credentials
+
+    ids = await _setup(alice)
+    pid = (
+        await alice.post(
+            "/credential-profiles",
+            json={"name": "shared", "api_username": "admin", "api_password": "profile-pw"},
+        )
+    ).json()["id"]
+    r = await alice.post(
+        "/devices",
+        json=_device(
+            ids["hq"], model="aruba_cx", credential_profile_id=pid, api_password="switch-pw"
+        ),
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["api_password_set"] is True and body["api_username"] is None
+    assert "switch-pw" not in r.text
+
+    async def creds():  # type: ignore[no-untyped-def]
+        async with app.state.database.sessionmaker() as db:
+            device = await db.get(Device, body["id"])
+            profile = await db.get(CredentialProfile, pid)
+            assert device is not None and "switch-pw" not in (device.api_password_encrypted or "")
+            return to_device_credentials(profile, app.state.secret_box, device)
+
+    # own password, user name from the profile
+    api = (await creds()).api
+    assert (api.username, api.password) == ("admin", "switch-pw")
+
+    # omitted password stays, own user name applies
+    r = await alice.patch(f"/devices/{body['id']}", json={"api_username": "ops"})
+    assert r.json()["api_password_set"] is True
+    api = (await creds()).api
+    assert (api.username, api.password) == ("ops", "switch-pw")
+
+    # empty values fall back to the profile
+    r = await alice.patch(f"/devices/{body['id']}", json={"api_username": "", "api_password": ""})
+    assert r.json()["api_password_set"] is False and r.json()["api_username"] is None
+    api = (await creds()).api
+    assert (api.username, api.password) == ("admin", "profile-pw")
+
+    entries = (await alice.get("/audit", params={"action": "device.update"})).json()["items"]
+    assert all("switch-pw" not in str(e) for e in entries)
+
+
+async def test_only_superadmin_sets_device_api_login(alice: AsyncClient, bob: AsyncClient) -> None:
+    ids = await _setup(alice)
+    device = (await alice.post("/devices", json=_device(ids["hq"]))).json()
+    await grant(alice, "bob", {ids["hq"]: "admin"})
+    r = await bob.patch(f"/devices/{device['id']}", json={"api_password": "x"})
+    assert r.status_code == 403
+    # other fields stay editable for site administrators
+    r = await bob.patch(f"/devices/{device['id']}", json={"location_note": "Rack 1"})
+    assert r.status_code == 200

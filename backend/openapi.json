@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Cesma NG",
-    "version": "0.14.6"
+    "version": "0.15.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -5377,6 +5377,30 @@
             "maxLength": 255,
             "title": "Location Note",
             "default": ""
+          },
+          "api_username": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Username"
+          },
+          "api_password": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Password"
           }
         },
         "type": "object",
@@ -5445,6 +5469,21 @@
           "location_note": {
             "type": "string",
             "title": "Location Note"
+          },
+          "api_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Username"
+          },
+          "api_password_set": {
+            "type": "boolean",
+            "title": "Api Password Set"
           },
           "status": {
             "$ref": "#/components/schemas/DeviceStatus"
@@ -5564,6 +5603,8 @@
           "room_id",
           "credential_profile_id",
           "location_note",
+          "api_username",
+          "api_password_set",
           "status",
           "sys_name",
           "model_name",
@@ -5670,6 +5711,30 @@
               }
             ],
             "title": "Location Note"
+          },
+          "api_username": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Username"
+          },
+          "api_password": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Password"
           }
         },
         "type": "object",

@@ -8,10 +8,16 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.crypto import SecretBox
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.models import CredentialProfile, Device, DeviceStatus, Permission, Site
 from app.services import audit
-from app.services.access import require_permission, require_site_access, visible_site_ids
+from app.services.access import (
+    require_permission,
+    require_site_access,
+    require_superadmin,
+    visible_site_ids,
+)
 from app.services.context import Caller
 from app.services.discovery import remember_ignored
 from app.services.org import room_site_id
@@ -25,6 +31,8 @@ EDITABLE_FIELDS = (
     "credential_profile_id",
     "location_note",
 )
+#: The switch's own API login. Only super administrators may set it, like profiles.
+LOGIN_FIELDS = ("api_username", "api_password")
 
 
 async def list_devices(
@@ -70,10 +78,13 @@ async def get_device(
     return device
 
 
-async def create_device(db: AsyncSession, caller: Caller, values: dict[str, Any]) -> Device:
+async def create_device(
+    db: AsyncSession, caller: Caller, box: SecretBox, values: dict[str, Any]
+) -> Device:
     require_permission(caller.user, values["site_id"], Permission.DEVICES_MANAGE)
     device = Device(status=DeviceStatus.UNKNOWN, location_note="")
     _apply(device, values)
+    _apply_login(caller, box, device, {k: v for k, v in values.items() if v is not None})
     await _validate_references(db, device)
     db.add(device)
     await _flush_unique(db)
@@ -90,13 +101,14 @@ async def create_device(db: AsyncSession, caller: Caller, values: dict[str, Any]
 
 
 async def update_device(
-    db: AsyncSession, caller: Caller, device_id: int, values: dict[str, Any]
+    db: AsyncSession, caller: Caller, box: SecretBox, device_id: int, values: dict[str, Any]
 ) -> Device:
     device = await get_device(db, caller, device_id, Permission.DEVICES_MANAGE)
     if "site_id" in values:
         require_permission(caller.user, values["site_id"], Permission.DEVICES_MANAGE)
     before = _snapshot(device)
     _apply(device, values)
+    _apply_login(caller, box, device, values)
     if "hostname" in values and values["hostname"] != before.get("hostname"):
         device.address_checked_at = None  # resolve IP and DNS name again on the next poll
     if device.status is DeviceStatus.UNCONFIRMED and values:
@@ -104,6 +116,8 @@ async def update_device(
     await _validate_references(db, device)
     await _flush_unique(db)
     old, new = audit.changes(before, _snapshot(device))
+    if values.get("api_password"):
+        new["api_password_changed"] = True  # the value itself is never logged
     if new:
         await audit.record(
             db,
@@ -139,6 +153,18 @@ def _apply(device: Device, values: dict[str, Any]) -> None:
             setattr(device, key, values[key])
 
 
+def _apply_login(caller: Caller, box: SecretBox, device: Device, values: dict[str, Any]) -> None:
+    """Own API login: an absent password stays unchanged, an empty one is cleared."""
+    if not any(key in values for key in LOGIN_FIELDS):
+        return
+    require_superadmin(caller.user)
+    if "api_username" in values:
+        device.api_username = (values["api_username"] or "").strip() or None
+    password = values.get("api_password")
+    if password is not None:
+        device.api_password_encrypted = box.encrypt(password) if password else None
+
+
 async def _validate_references(db: AsyncSession, device: Device) -> None:
     if await db.get(Site, device.site_id) is None:
         raise ValidationFailedError("Unknown site")
@@ -163,4 +189,9 @@ def _snapshot(device: Device) -> dict[str, Any]:
     def plain(value: Any) -> Any:
         return value.value if isinstance(value, StrEnum) else value
 
-    return {key: plain(getattr(device, key)) for key in EDITABLE_FIELDS}
+    return {
+        **{key: plain(getattr(device, key)) for key in EDITABLE_FIELDS},
+        "api_username": device.api_username,
+        # whether a password is set, never the password itself
+        "api_password_set": device.api_password_set,
+    }

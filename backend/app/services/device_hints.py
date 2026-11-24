@@ -18,7 +18,7 @@ from app.models import (
 )
 from app.services.access import require_site_access
 from app.services.context import Caller
-from app.services.credentials import read_secrets
+from app.services.credentials import device_api_login, read_secrets
 
 
 @dataclass(frozen=True)
@@ -84,6 +84,8 @@ def _credential_hints(
     if issubclass(WRITERS[device.model], CliWriter):
         if not profile.ssh_username or not secrets.get("ssh_password"):
             hints.append(Hint(device.id, "no_ssh_login", "warning", profile.name))
-    elif not profile.api_username or not secrets.get("api_password"):
-        hints.append(Hint(device.id, "no_api_login", "warning", profile.name))
+    else:
+        username, password = device_api_login(device, box)
+        if not (username or profile.api_username) or not (password or secrets.get("api_password")):
+            hints.append(Hint(device.id, "no_api_login", "warning", profile.name))
     return hints

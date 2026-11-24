@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import Sequence
+from dataclasses import replace
 from typing import Any
 
 import asyncssh
@@ -17,7 +18,7 @@ from app.domain.credentials import (
     LoginCredentials,
     SnmpCredentials,
 )
-from app.models import CredentialProfile, SnmpVersion
+from app.models import CredentialProfile, Device, SnmpVersion
 from app.services import audit
 from app.services.access import require_superadmin
 from app.services.context import Caller
@@ -86,7 +87,30 @@ async def generate_ssh_key(
     return profile
 
 
-def to_device_credentials(profile: CredentialProfile | None, box: SecretBox) -> DeviceCredentials:
+def to_device_credentials(
+    profile: CredentialProfile | None, box: SecretBox, device: Device | None = None
+) -> DeviceCredentials:
+    """Access data of the profile; the device's own API login (if any) takes precedence."""
+    credentials = _profile_credentials(profile, box)
+    if device is None:
+        return credentials
+    username, password = device_api_login(device, box)
+    if not username and not password:
+        return credentials
+    api = credentials.api
+    return replace(
+        credentials,
+        api=replace(api, username=username or api.username, password=password or api.password),
+    )
+
+
+def device_api_login(device: Device, box: SecretBox) -> tuple[str | None, str | None]:
+    """The switch's own API user and password (``None`` where the profile applies)."""
+    password = box.decrypt(device.api_password_encrypted) if device.api_password_encrypted else None
+    return device.api_username or None, password or None
+
+
+def _profile_credentials(profile: CredentialProfile | None, box: SecretBox) -> DeviceCredentials:
     if profile is None:
         return DeviceCredentials()
     s = read_secrets(profile, box)

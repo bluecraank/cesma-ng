@@ -1566,6 +1566,10 @@ export interface components {
              * @default
              */
             location_note: string;
+            /** Api Username */
+            api_username?: string | null;
+            /** Api Password */
+            api_password?: string | null;
         };
         /**
          * DeviceModel
@@ -1590,6 +1594,10 @@ export interface components {
             credential_profile_id: number | null;
             /** Location Note */
             location_note: string;
+            /** Api Username */
+            api_username: string | null;
+            /** Api Password Set */
+            api_password_set: boolean;
             status: components["schemas"]["DeviceStatus"];
             /** Sys Name */
             sys_name: string | null;
@@ -1632,6 +1640,10 @@ export interface components {
             credential_profile_id?: number | null;
             /** Location Note */
             location_note?: string | null;
+            /** Api Username */
+            api_username?: string | null;
+            /** Api Password */
+            api_password?: string | null;
         };
         /** DeviceVlanOut */
         DeviceVlanOut: {

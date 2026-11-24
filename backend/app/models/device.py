@@ -63,6 +63,9 @@ class Device(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(100), unique=True)
     hostname: Mapped[str] = mapped_column(String(255), unique=True)
     model: Mapped[DeviceModel] = mapped_column(str_enum(DeviceModel, 30))
+    #: Own API login of this switch; each value set overrides the one of the profile.
+    api_username: Mapped[str | None] = mapped_column(String(100))
+    api_password_encrypted: Mapped[str | None] = mapped_column(Text)
     location_note: Mapped[str] = mapped_column(String(255), default="")
     status: Mapped[DeviceStatus] = mapped_column(
         str_enum(DeviceStatus, 20), default=DeviceStatus.UNKNOWN
@@ -84,6 +87,10 @@ class Device(TimestampMixin, Base):
     site: Mapped[Site] = relationship()
     room: Mapped[Room | None] = relationship()
     credential_profile: Mapped[CredentialProfile | None] = relationship()
+
+    @property
+    def api_password_set(self) -> bool:
+        return bool(self.api_password_encrypted)
 
     @property
     def supports_ssh_keys(self) -> bool:

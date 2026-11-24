@@ -162,6 +162,10 @@ class DeviceIn(BaseModel):
     room_id: int | None = None
     credential_profile_id: int | None = None
     location_note: str = Field(default="", max_length=255)
+    #: own API login of this switch (super admins only), overrides the profile's
+    api_username: str | None = Field(default=None, max_length=100)
+    #: write-only; ``None`` keeps it, an empty string clears it
+    api_password: str | None = Field(default=None, max_length=255)
 
 
 class DeviceUpdate(BaseModel):
@@ -172,6 +176,8 @@ class DeviceUpdate(BaseModel):
     room_id: int | None = None
     credential_profile_id: int | None = None
     location_note: str | None = Field(default=None, max_length=255)
+    api_username: str | None = Field(default=None, max_length=100)
+    api_password: str | None = Field(default=None, max_length=255)
 
 
 class DeviceOut(ORM):
@@ -183,6 +189,9 @@ class DeviceOut(ORM):
     room_id: int | None
     credential_profile_id: int | None
     location_note: str
+    #: own API login of this switch; the password is never returned
+    api_username: str | None
+    api_password_set: bool
     status: DeviceStatus
     sys_name: str | None
     model_name: str | None

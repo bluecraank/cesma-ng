@@ -24,6 +24,10 @@ const roomOptions = computed(() => sites.rooms(form.value.site_id))
 
 const profiles = ref<CredentialProfile[]>([])
 const busy = ref(false)
+/** The device's own API password: empty means unchanged, unless it is to be removed. */
+const apiPassword = ref('')
+const clearApiPassword = ref(false)
+const usesApi = computed(() => form.value.model === 'aruba_os_switch' || form.value.model === 'aruba_cx')
 const detecting = ref(false)
 
 /** Ask the switch via SNMP which model it is and pre-fill the form. */
@@ -55,6 +59,7 @@ function empty(): DeviceIn {
     room_id: null,
     credential_profile_id: null,
     location_note: '',
+    api_username: null,
   }
 }
 
@@ -72,8 +77,11 @@ watch(open, async (isOpen) => {
         room_id: d.room_id,
         credential_profile_id: d.credential_profile_id,
         location_note: d.location_note,
+        api_username: d.api_username,
       }
     : empty()
+  apiPassword.value = ''
+  clearApiPassword.value = false
   // Only super admins may list profiles; others keep the profile assigned by an admin.
   if (auth.isSuperadmin) profiles.value = await api.get<CredentialProfile[]>('/credential-profiles')
 })
@@ -85,12 +93,25 @@ watch(
   },
 )
 
+/** Only super admins send the own API login; an empty password field keeps the stored one. */
+function payload(): DeviceIn {
+  const body: DeviceIn = { ...form.value }
+  if (!auth.isSuperadmin) {
+    delete body.api_username
+    return body
+  }
+  body.api_username = body.api_username?.trim() || null
+  if (clearApiPassword.value) body.api_password = ''
+  else if (apiPassword.value) body.api_password = apiPassword.value
+  return body
+}
+
 async function save(): Promise<void> {
   busy.value = true
   const ok = await notify.run(async () => {
     const saved = props.device
-      ? await api.patch<Device>(`/devices/${props.device.id}`, form.value)
-      : await api.post<Device>('/devices', form.value)
+      ? await api.patch<Device>(`/devices/${props.device.id}`, payload())
+      : await api.post<Device>('/devices', payload())
     emit('saved', saved)
   }, t('common.saved'))
   busy.value = false
@@ -142,6 +163,33 @@ async function save(): Promise<void> {
           <option v-for="p in profiles" :key="p.id" :value="p.id">{{ p.name }}</option>
         </select>
       </div>
+      <fieldset
+        v-if="auth.isSuperadmin && usesApi"
+        class="grid gap-4 rounded-lg border border-gray-200 p-4 sm:col-span-2 sm:grid-cols-2 dark:border-white/10"
+      >
+        <legend class="px-1 text-sm font-semibold">{{ t('device.ownApiLogin') }}</legend>
+        <p class="text-xs text-gray-500 sm:col-span-2 dark:text-gray-400">{{ t('device.ownApiLoginHint') }}</p>
+        <div class="field">
+          <label class="label" for="d-au">{{ t('device.apiUsername') }}</label>
+          <input id="d-au" v-model="form.api_username" class="input" autocomplete="off" :placeholder="t('device.fromProfile')" />
+        </div>
+        <div class="field">
+          <label class="label" for="d-apw">{{ t('device.apiPassword') }}</label>
+          <input
+            id="d-apw"
+            v-model="apiPassword"
+            type="password"
+            class="input"
+            autocomplete="new-password"
+            :disabled="clearApiPassword"
+            :placeholder="device?.api_password_set ? t('credentials.secretHint') : t('device.fromProfile')"
+          />
+          <label v-if="device?.api_password_set" class="mt-1 flex items-center gap-2 text-xs">
+            <input v-model="clearApiPassword" type="checkbox" />
+            {{ t('device.clearApiPassword') }}
+          </label>
+        </div>
+      </fieldset>
       <div class="field sm:col-span-2">
         <label class="label" for="d-loc">{{ t('device.location') }}</label>
         <input id="d-loc" v-model="form.location_note" class="input" />

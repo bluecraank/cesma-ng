@@ -106,6 +106,12 @@ export default {
     uptime: 'Laufzeit',
     location: 'Standortnotiz',
     credentials: 'Zugangsprofil',
+    ownApiLogin: 'Eigene API-Zugangsdaten',
+    ownApiLoginHint: 'Nur für HP/Aruba (REST-API). Leere Felder übernehmen die Werte aus dem Zugangsprofil.',
+    apiUsername: 'API-Benutzer',
+    apiPassword: 'API-Passwort',
+    fromProfile: 'aus dem Zugangsprofil',
+    clearApiPassword: 'Eigenes Passwort entfernen',
     details: 'Details',
     models: {
       dell_n1500: 'Dell N1500 (DNOS 6)',

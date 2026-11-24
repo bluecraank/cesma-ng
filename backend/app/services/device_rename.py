@@ -72,6 +72,6 @@ async def apply_rename(
             new={"sys_name": device.sys_name},
         )
     if device.name != name.strip():
-        await update_device(db, caller, device.id, {"name": name.strip()})
+        await update_device(db, caller, runtime.box, device.id, {"name": name.strip()})
     await polling.request_poll(db, device.id)
     return plan, log
