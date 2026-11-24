@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** Front panel view of all switches: which ports are in use, which are free for a new connection. */
-import { ArrowTopRightOnSquareIcon, MapPinIcon, PencilSquareIcon, SignalIcon } from '@heroicons/vue/20/solid'
+import { ArrowTopRightOnSquareIcon, MagnifyingGlassIcon, MapPinIcon, PencilSquareIcon, SignalIcon } from '@heroicons/vue/20/solid'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/api/client'
@@ -28,6 +28,7 @@ const auth = useAuthStore()
 const DAYS = [7, 30, 90, 180, 365]
 /** Live state: every port without link counts as free, regardless of how long it has been down. */
 const live = ref(false)
+const search = ref('')
 const place = ref('') // "" | "b:<id>" | "r:<id>"
 const minDays = ref(30)
 const includeDisabled = ref(false)
@@ -45,15 +46,17 @@ function state(p: SwitchPort): State {
   return p.admin_up ? 'down' : 'disabled'
 }
 
-const switches = computed(() =>
-  result.value
+const switches = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  return result.value
+    .filter((d) => !q || [d.device_name, d.model_name, d.building, d.room].some((v) => v?.toLowerCase().includes(q)))
     .map((d) => {
       const counts = { free: 0, up: 0, uplink: 0, down: 0, disabled: 0 }
       for (const p of d.ports) counts[state(p)] += 1
       return { ...d, counts, units: panelLayout(d.ports) }
     })
-    .filter((d) => !onlyWithFree.value || d.counts.free),
-)
+    .filter((d) => !onlyWithFree.value || d.counts.free)
+})
 const totalFree = computed(() => switches.value.reduce((sum, d) => sum + d.counts.free, 0))
 
 async function load(): Promise<void> {
@@ -170,6 +173,13 @@ function facts(p: SwitchPort): string[] {
     </div>
 
     <div class="card flex flex-wrap items-end gap-4 p-4">
+      <div class="field">
+        <label class="label" for="sp-search">{{ t('switchports.search') }}</label>
+        <div class="relative">
+          <MagnifyingGlassIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-gray-400" />
+          <input id="sp-search" v-model="search" class="input w-64 pl-8" :placeholder="t('switchports.searchHint')" />
+        </div>
+      </div>
       <div class="field">
         <label class="label" for="sp-place">{{ t('switchports.place') }}</label>
         <select id="sp-place" v-model="place" class="input w-64">

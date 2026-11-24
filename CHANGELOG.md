@@ -8,6 +8,18 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-24
+
+### Hinzugefügt
+
+- Switchports: Suchfeld für die Switches (Name, Modell, Gebäude, Raum)
+- Die Suche in der Switch-Liste findet Switches jetzt auch über Gebäude, Raum und Standortnotiz
+
+### Geändert
+
+- Der Menüpunkt „Geräte“ heißt jetzt „Switches“
+- Port bearbeiten: „Nur zugewiesene“ ist in der VLAN-Liste nicht mehr vorausgewählt. Ist der Haken gesetzt, durchsucht das Suchfeld nur noch die zugewiesenen VLANs
+
 ## [0.15.0] - 2026-11-17
 
 ### Hinzugefügt

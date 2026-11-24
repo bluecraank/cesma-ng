@@ -60,7 +60,7 @@ watch(open, async (isOpen) => {
   members.value = { ...initial.value }
   untaggedTouched.value = false
   filter.value = ''
-  onlyAssigned.value = props.vlans.length > 12
+  onlyAssigned.value = false
   profiles.value = await api.get<PortProfile[]>(`/sites/${props.siteId}/port-profiles`).catch(() => [])
 }, { immediate: true })
 
@@ -105,7 +105,7 @@ const shownVlans = computed(() => {
   return props.vlans.filter(
     (v) =>
       (!q || String(v.vid).startsWith(q) || v.name.toLowerCase().includes(q)) &&
-      (!onlyAssigned.value || q || members.value[v.vid] !== 'none' || initial.value[v.vid] !== 'none'),
+      (!onlyAssigned.value || members.value[v.vid] !== 'none' || initial.value[v.vid] !== 'none'),
   )
 })
 

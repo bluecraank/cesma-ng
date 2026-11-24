@@ -89,12 +89,23 @@ function sortBy(key: SortKey): void {
   sortKey.value = key
 }
 
+/** room id -> "building room", so the search also finds switches by their place */
+const places = computed(() => {
+  const map = new Map<number, string>()
+  for (const b of sites.current?.buildings ?? []) for (const r of b.rooms) map.set(r.id, `${b.name} ${r.name}`)
+  return map
+})
+
 const rows = computed(() => {
   const q = search.value.trim().toLowerCase()
+  const place = (d: Device): string | undefined => (d.room_id === null ? undefined : places.value.get(d.room_id))
   const filtered = devices.value.filter(
     (d) =>
       (!statusFilter.value || d.status === statusFilter.value) &&
-      (!q || [d.name, d.hostname, d.ip_address, d.dns_name, d.model_name, d.serial_number, d.firmware].some((v) => v?.toLowerCase().includes(q))),
+      (!q ||
+        [d.name, d.hostname, d.ip_address, d.dns_name, d.model_name, d.serial_number, d.firmware, place(d), d.location_note].some((v) =>
+          v?.toLowerCase().includes(q),
+        )),
   )
   const dir = sortAsc.value ? 1 : -1
   const value = (d: Device): string =>
