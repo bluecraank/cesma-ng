@@ -2,6 +2,8 @@
 import { PencilSquareIcon } from '@heroicons/vue/20/solid'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import UiSortTh from '@/components/ui/UiSortTh.vue'
+import { useTableSort } from '@/composables/useTableSort'
 import { api, type Role, type User } from '@/api/client'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import UiToggle from '@/components/ui/UiToggle.vue'
@@ -14,6 +16,11 @@ const notify = useNotify()
 const sites = useSitesStore()
 
 const users = ref<User[]>([])
+const { sort, sorted } = useTableSort(() => users.value, {
+  name: (u) => u.display_name || u.username,
+  active: (u) => u.is_active,
+  lastLogin: (u) => u.last_login_at,
+})
 const editing = ref<User | null>(null)
 const dialogOpen = ref(false)
 const roles = ref<Role[]>([])
@@ -66,15 +73,15 @@ onMounted(load)
       <table class="table">
         <thead>
           <tr>
-            <th>{{ t('users.username') }}</th>
+            <UiSortTh :sort="sort" column="name">{{ t('users.username') }}</UiSortTh>
             <th>{{ t('users.siteRoles') }}</th>
-            <th>{{ t('users.active') }}</th>
-            <th>{{ t('users.lastLogin') }}</th>
+            <UiSortTh :sort="sort" column="active">{{ t('users.active') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="lastLogin">{{ t('users.lastLogin') }}</UiSortTh>
             <th class="w-10"><span class="sr-only">{{ t('common.actions') }}</span></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="u in users" :key="u.id">
+          <tr v-for="u in sorted" :key="u.id">
             <td>
               <div class="font-medium text-gray-900 dark:text-white">{{ u.display_name || u.username }}</div>
               <div class="text-xs text-gray-500 dark:text-gray-400">{{ u.username }}<template v-if="u.email"> · {{ u.email }}</template></div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckIcon, ChevronUpDownIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, PlusIcon, SignalIcon, XMarkIcon } from '@heroicons/vue/20/solid'
+import { CheckIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, PlusIcon, SignalIcon, XMarkIcon } from '@heroicons/vue/20/solid'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -10,10 +10,16 @@ import { useConfirmDelete } from '@/composables/useConfirm'
 import { useJobWatcher } from '@/composables/useJobWatcher'
 import DeviceStatusTag from '@/components/DeviceStatusTag.vue'
 import SwitchIcon from '@/components/SwitchIcon.vue'
+import UiColumnMenu from '@/components/ui/UiColumnMenu.vue'
+import UiCsvButton from '@/components/ui/UiCsvButton.vue'
+import UiSortTh from '@/components/ui/UiSortTh.vue'
 import UiSpinner from '@/components/ui/UiSpinner.vue'
+import { useColumns } from '@/composables/useColumns'
 import { useNotify } from '@/composables/useNotify'
+import { useTableSort } from '@/composables/useTableSort'
 import { useAuthStore } from '@/stores/auth'
 import { useSitesStore } from '@/stores/sites'
+import { csvDate, downloadCsv } from '@/utils/csv'
 import { formatDateTime } from '@/utils/format'
 
 const { t, locale } = useI18n()
@@ -51,21 +57,43 @@ async function reject(device: Device): Promise<void> {
   }
 }
 
-type SortKey = 'name' | 'ip_address' | 'dns_name' | 'model' | 'firmware' | 'status' | 'last_seen_at'
-const sortKey = ref<SortKey>('name')
-const sortAsc = ref(true)
-
 const canCreate = computed(() => auth.can('devices.manage', sites.currentId))
 
-const columns = computed<{ key: SortKey; label: string }[]>(() => [
+const columns = computed<{ key: Parameters<typeof sort.toggle>[0]; label: string }[]>(() => [
   { key: 'name', label: t('common.name') },
   { key: 'ip_address', label: t('device.ip') },
   { key: 'dns_name', label: t('device.dns') },
+  { key: 'place', label: t('switchports.place') },
   { key: 'model', label: t('device.model') },
   { key: 'firmware', label: t('device.firmware') },
   { key: 'status', label: t('device.status') },
   { key: 'last_seen_at', label: t('device.lastSeen') },
 ])
+// The name always stays; everything else can be hidden.
+const cols = useColumns<(typeof columns.value)[number]['key']>('devices')
+const optionalColumns = computed(() => columns.value.filter((c) => c.key !== 'name'))
+const shownColumns = computed(() => columns.value.filter((c) => c.key === 'name' || cols.shows(c.key)))
+
+/** All columns of the rows currently shown, whatever is hidden on screen. */
+function exportCsv(): void {
+  downloadCsv(
+    `switches-${sites.current?.name ?? ''}`,
+    [t('common.name'), t('device.hostname'), t('device.ip'), t('device.dns'), t('switchports.place'), t('device.location'), t('device.model'), t('device.serial'), t('device.firmware'), t('device.status'), t('device.lastSeen')],
+    rows.value.map((d) => [
+      d.name,
+      d.hostname,
+      d.ip_address,
+      d.dns_name,
+      place(d),
+      d.location_note,
+      d.model_name || t(`device.models.${d.model}`),
+      d.serial_number,
+      d.firmware,
+      t(`device.statuses.${d.status}`),
+      csvDate(d.last_seen_at),
+    ]),
+  )
+}
 
 async function load(): Promise<void> {
   if (sites.currentId === null) return
@@ -79,27 +107,18 @@ async function load(): Promise<void> {
   loading.value = false
 }
 
-/** 10.0.0.9 before 10.0.0.10 */
-function ipSortKey(ip: string | null): string {
-  return ip ? ip.split('.').map((part) => part.padStart(3, '0')).join('.') : '~'
-}
-
-function sortBy(key: SortKey): void {
-  sortAsc.value = sortKey.value === key ? !sortAsc.value : true
-  sortKey.value = key
-}
-
 /** room id -> "building room", so the search also finds switches by their place */
 const places = computed(() => {
   const map = new Map<number, string>()
-  for (const b of sites.current?.buildings ?? []) for (const r of b.rooms) map.set(r.id, `${b.name} ${r.name}`)
+  for (const b of sites.current?.buildings ?? []) for (const r of b.rooms) map.set(r.id, `${b.name} · ${r.name}`)
   return map
 })
 
-const rows = computed(() => {
+const place = (d: Device): string | undefined => (d.room_id === null ? undefined : places.value.get(d.room_id))
+
+const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
-  const place = (d: Device): string | undefined => (d.room_id === null ? undefined : places.value.get(d.room_id))
-  const filtered = devices.value.filter(
+  return devices.value.filter(
     (d) =>
       (!statusFilter.value || d.status === statusFilter.value) &&
       (!q ||
@@ -107,11 +126,22 @@ const rows = computed(() => {
           v?.toLowerCase().includes(q),
         )),
   )
-  const dir = sortAsc.value ? 1 : -1
-  const value = (d: Device): string =>
-    sortKey.value === 'ip_address' ? ipSortKey(d.ip_address) : String(d[sortKey.value] ?? '')
-  return [...filtered].sort((a, b) => value(a).localeCompare(value(b), undefined, { numeric: true }) * dir)
 })
+
+const { sort, sorted: rows } = useTableSort(
+  () => filtered.value,
+  {
+    name: (d) => d.name,
+    ip_address: (d) => d.ip_address,
+    dns_name: (d) => d.dns_name,
+    place,
+    model: (d) => d.model_name || d.model,
+    firmware: (d) => d.firmware,
+    status: (d) => d.status,
+    last_seen_at: (d) => d.last_seen_at,
+  },
+  'name',
+)
 
 watch(() => sites.currentId, load, { immediate: true })
 </script>
@@ -132,6 +162,8 @@ watch(() => sites.currentId, load, { immediate: true })
           <option value="">{{ t('device.allStatuses') }}</option>
           <option v-for="s in STATUS_FILTERS" :key="s" :value="s">{{ t(`device.statuses.${s}`) }}</option>
         </select>
+        <UiColumnMenu :columns="optionalColumns" :state="cols" />
+        <UiCsvButton :disabled="!rows.length" @click="exportCsv" />
         <button v-if="canCreate" type="button" class="btn btn-secondary" @click="discoverOpen = true">
           <SignalIcon class="size-4" /> {{ t('discover.title') }}
         </button>
@@ -165,12 +197,7 @@ watch(() => sites.currentId, load, { immediate: true })
         <thead>
           <tr>
             <th class="w-12"><span class="sr-only">{{ t('device.model') }}</span></th>
-            <th v-for="col in columns" :key="col.key">
-              <button type="button" class="inline-flex items-center gap-1 hover:text-gray-900 dark:hover:text-white" @click="sortBy(col.key)">
-                {{ col.label }}
-                <ChevronUpDownIcon class="size-4" :class="sortKey === col.key ? 'text-brand-500' : 'opacity-40'" />
-              </button>
-            </th>
+            <UiSortTh v-for="col in shownColumns" :key="col.key" :sort="sort" :column="col.key">{{ col.label }}</UiSortTh>
           </tr>
         </thead>
         <tbody>
@@ -192,18 +219,19 @@ watch(() => sites.currentId, load, { immediate: true })
                 <ExclamationTriangleIcon class="size-4" />
               </RouterLink>
             </td>
-            <td class="whitespace-nowrap"><span v-if="d.ip_address">{{ d.ip_address }}</span><span v-else class="muted">—</span></td>
-            <td class="max-w-56 truncate" :title="d.dns_name ?? ''"><span v-if="d.dns_name">{{ d.dns_name }}</span><span v-else class="muted">—</span></td>
-            <td>{{ d.model_name || t(`device.models.${d.model}`) }}</td>
-            <td>{{ d.firmware || '—' }}</td>
-            <td><DeviceStatusTag :status="d.status" /></td>
-            <td class="whitespace-nowrap tabular-nums">{{ formatDateTime(d.last_seen_at, locale) }}</td>
+            <td v-if="cols.shows('ip_address')" class="whitespace-nowrap"><span v-if="d.ip_address">{{ d.ip_address }}</span><span v-else class="muted">—</span></td>
+            <td v-if="cols.shows('dns_name')" class="max-w-56 truncate" :title="d.dns_name ?? ''"><span v-if="d.dns_name">{{ d.dns_name }}</span><span v-else class="muted">—</span></td>
+            <td v-if="cols.shows('place')" class="max-w-56 truncate" :title="place(d) ?? ''"><span v-if="place(d)">{{ place(d) }}</span><span v-else class="muted">—</span></td>
+            <td v-if="cols.shows('model')">{{ d.model_name || t(`device.models.${d.model}`) }}</td>
+            <td v-if="cols.shows('firmware')">{{ d.firmware || '—' }}</td>
+            <td v-if="cols.shows('status')"><DeviceStatusTag :status="d.status" /></td>
+            <td v-if="cols.shows('last_seen_at')" class="whitespace-nowrap tabular-nums">{{ formatDateTime(d.last_seen_at, locale) }}</td>
           </tr>
           <tr v-if="loading">
-            <td :colspan="columns.length + 1" class="py-8"><UiSpinner class="mx-auto" /></td>
+            <td :colspan="shownColumns.length + 1" class="py-8"><UiSpinner class="mx-auto" /></td>
           </tr>
           <tr v-else-if="!rows.length">
-            <td :colspan="columns.length + 1" class="py-8 text-center text-gray-500">—</td>
+            <td :colspan="shownColumns.length + 1" class="py-8 text-center text-gray-500">—</td>
           </tr>
         </tbody>
       </table>

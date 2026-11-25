@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Cesma NG",
-    "version": "0.16.0"
+    "version": "0.17.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -1928,6 +1928,63 @@
         }
       }
     },
+    "/api/v1/devices/{device_id}/ports/unbind": {
+      "post": {
+        "tags": [
+          "configuration"
+        ],
+        "summary": "Unbind Ports",
+        "description": "Release ports from their port profile (the switch configuration is not touched).",
+        "operationId": "unbind_ports_api_v1_devices__device_id__ports_unbind_post",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortIdsIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Unbind Ports Api V1 Devices  Device Id  Ports Unbind Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/devices/{device_id}/rename/plan": {
       "post": {
         "tags": [
@@ -2515,6 +2572,58 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{site_id}/port-profiles/{profile_id}/roll-out": {
+      "post": {
+        "tags": [
+          "configuration"
+        ],
+        "summary": "Roll Out Profile",
+        "description": "Apply the profile again to all bound ports (e.g. after a switch was offline).",
+        "operationId": "roll_out_profile_api_v1_sites__site_id__port_profiles__profile_id__roll_out_post",
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Site Id"
+            }
+          },
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -4231,6 +4340,32 @@
                   },
                   "type": "object",
                   "title": "Response Health Api V1 Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/features": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Features",
+        "description": "Functions that can be switched off in the configuration (the UI hides them).",
+        "operationId": "features_api_v1_features_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "type": "object",
+                  "title": "Response Features Api V1 Features Get"
                 }
               }
             }
@@ -6828,7 +6963,8 @@
           "fdb",
           "arp",
           "lldp",
-          "counters"
+          "counters",
+          "login"
         ],
         "title": "PollTask"
       },
@@ -6928,6 +7064,11 @@
               }
             ],
             "title": "Profile Id"
+          },
+          "bind": {
+            "type": "boolean",
+            "title": "Bind",
+            "default": false
           }
         },
         "type": "object",
@@ -7070,6 +7211,24 @@
         ],
         "title": "PortHistoryOut"
       },
+      "PortIdsIn": {
+        "properties": {
+          "port_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Port Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "port_ids"
+        ],
+        "title": "PortIdsIn"
+      },
       "PortKind": {
         "type": "string",
         "enum": [
@@ -7182,6 +7341,17 @@
             "type": "boolean",
             "title": "Is Uplink",
             "default": false
+          },
+          "port_profile_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port Profile Id"
           },
           "neighbor": {
             "anyOf": [
@@ -7318,6 +7488,22 @@
               }
             ],
             "title": "Description"
+          },
+          "bound_ports": {
+            "type": "integer",
+            "title": "Bound Ports",
+            "default": 0
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
           }
         },
         "type": "object",

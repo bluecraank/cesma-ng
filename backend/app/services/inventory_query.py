@@ -67,6 +67,7 @@ async def list_ports(db: AsyncSession, caller: Caller, device_id: int) -> list[d
                 "untagged_vlans": [v.vid for v in port.vlans if not v.tagged],
                 "tagged_vlans": [v.vid for v in port.vlans if v.tagged],
                 "is_uplink": port.id in uplinks,
+                "port_profile_id": port.port_profile_id,
                 "neighbor": (neighbor.system_name or neighbor.chassis_id) if neighbor else None,
                 "neighbor_device_id": neighbor.remote_device_id if neighbor else None,
                 "mac_count": mac_counts.get(port.id, 0),

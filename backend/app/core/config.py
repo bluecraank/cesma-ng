@@ -48,12 +48,20 @@ class Settings(BaseSettings):
     ldap_verify_tls: bool = True
     ldap_ca_file: str | None = None
 
+    # Features
+    ssh_key_push_enabled: bool = Field(
+        default=False,
+        description="Upload the SSH key list to the switches (switched off for now)",
+    )
+
     # Polling (seconds)
     poll_inventory_interval: int = 120
     poll_fdb_interval: int = 300
     poll_arp_interval: int = 300
     poll_lldp_interval: int = 3600
     poll_counters_interval: int = 300
+    #: failed logins are retried with growing backoff, so switch accounts do not get locked
+    poll_login_interval: int = 3600
     poll_concurrency: int = 20
     poll_timeout: int = 120
     #: consecutive failed inventory polls before a device is marked offline

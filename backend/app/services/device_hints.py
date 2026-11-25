@@ -25,7 +25,7 @@ from app.services.credentials import device_api_login, read_secrets
 class Hint:
     device_id: int
     #: no_profile | snmp_default | snmp_v3_incomplete | no_ssh_login | no_api_login |
-    #: unreachable | never_polled
+    #: login_failed | unreachable | never_polled
     code: str
     #: "error" blocks polling, "warning" blocks changes/backups
     level: str
@@ -46,25 +46,34 @@ async def site_hints(db: AsyncSession, caller: Caller, box: SecretBox, site_id: 
         .all()
     )
     profiles = {p.id: p for p in (await db.execute(select(CredentialProfile))).scalars()}
-    errors = {
-        s.device_id: s.last_error
-        for s in (
-            await db.execute(
-                select(DevicePollState).where(
-                    DevicePollState.task == PollTask.INVENTORY,
-                    DevicePollState.device_id.in_([d.id for d in devices]),
-                )
+    errors: dict[PollTask, dict[int, str | None]] = {PollTask.INVENTORY: {}, PollTask.LOGIN: {}}
+    for s in (
+        await db.execute(
+            select(DevicePollState).where(
+                DevicePollState.task.in_(list(errors)),
+                DevicePollState.device_id.in_([d.id for d in devices]),
+                DevicePollState.failures > 0,
             )
-        ).scalars()
-    }
+        )
+    ).scalars():
+        errors[s.task][s.device_id] = s.last_error
+    login_errors = errors[PollTask.LOGIN]
+    inventory_errors = errors[PollTask.INVENTORY]
     hints: list[Hint] = []
     for device in devices:
         profile = profiles.get(device.credential_profile_id or -1)
         hints += _credential_hints(device, profile, box)
         if device.status is DeviceStatus.OFFLINE:
-            hints.append(Hint(device.id, "unreachable", "error", errors.get(device.id) or ""))
-        elif device.last_seen_at is None and errors.get(device.id):
-            hints.append(Hint(device.id, "never_polled", "error", errors[device.id] or ""))
+            hints.append(
+                Hint(device.id, "unreachable", "error", inventory_errors.get(device.id) or "")
+            )
+        elif device.last_seen_at is None and inventory_errors.get(device.id):
+            hints.append(
+                Hint(device.id, "never_polled", "error", inventory_errors[device.id] or "")
+            )
+        elif device.id in login_errors:
+            # reachable, but changes and backups fail: wrong user/password or key
+            hints.append(Hint(device.id, "login_failed", "warning", login_errors[device.id] or ""))
     return hints
 
 

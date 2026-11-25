@@ -359,3 +359,17 @@ def test_hostname_on_every_model() -> None:
     assert Os10CliWriter("sw", CREDS).render(op) == ["hostname sw-eg-01"]
     assert ArubaOsRestWriter("sw", CREDS).render(op) == ['PUT /system {"name": "sw-eg-01"}']
     assert ArubaCxRestWriter("sw", CREDS).render(op) == ['PATCH /system {"hostname": "sw-eg-01"}']
+
+
+async def test_failed_ssh_login_is_a_write_error() -> None:
+    """A wrong password must reach the user as a switch error, not as "HTTP 500"."""
+    from app.transports.cli import CliError
+
+    async def denied():  # type: ignore[no-untyped-def]
+        raise CliError("SSH to sw failed: Permission denied")
+
+    w = DnosCliWriter("sw", CREDS, cli_factory=denied)
+    with pytest.raises(WriteError, match="Permission denied"):
+        await w.apply([SetPortDescription("1/0/1", "x")])
+    with pytest.raises(WriteError, match="Permission denied"):
+        await w.running_config()

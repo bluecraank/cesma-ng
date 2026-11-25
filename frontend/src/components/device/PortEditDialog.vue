@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ArrowUturnLeftIcon, ExclamationTriangleIcon, MagnifyingGlassIcon } from '@heroicons/vue/20/solid'
+import { ArrowUturnLeftIcon, ExclamationTriangleIcon, LinkIcon, LinkSlashIcon, MagnifyingGlassIcon, XCircleIcon } from '@heroicons/vue/20/solid'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { api, type ApplyResult, type ChangePlan, type DeviceVlan, type Port, type PortProfile } from '@/api/client'
+import { api, ApiError, type ApplyResult, type ChangePlan, type DeviceVlan, type Port, type PortProfile } from '@/api/client'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import UiSpinner from '@/components/ui/UiSpinner.vue'
 import { useNotify } from '@/composables/useNotify'
+import { vlanMatcher } from '@/utils/vlanFilter'
 
 const props = defineProps<{ deviceId: number; siteId: number; ports: Port[]; vlans: DeviceVlan[] }>()
 const open = defineModel<boolean>('open', { required: true })
@@ -21,6 +22,8 @@ const CHOICES = ['none', 'untagged', 'tagged'] as const
 
 const profiles = ref<PortProfile[]>([])
 const profileId = ref<number | null>(null)
+/** Bind the ports to the chosen profile: later profile changes are applied to them. */
+const bind = ref(false)
 const description = ref('')
 const enabled = ref<Tri>('keep')
 const members = ref<Record<number, Member>>({})
@@ -29,8 +32,21 @@ const filter = ref('')
 const onlyAssigned = ref(false)
 const plan = ref<ChangePlan | null>(null)
 const busy = ref(false)
+/** Why the last preview/apply failed, shown in the dialog itself (not only as a toast). */
+const failure = ref<string | null>(null)
 
 const single = computed(() => (props.ports.length === 1 ? props.ports[0] : null))
+
+/** Selected ports bound to a profile: VLANs and description only change through the profile. */
+const boundPorts = computed(() => props.ports.filter((p) => p.port_profile_id != null))
+const boundProfileIds = computed(() => [...new Set(boundPorts.value.map((p) => p.port_profile_id!))])
+const boundNames = computed(() =>
+  boundProfileIds.value.map((id) => profiles.value.find((p) => p.id === id)?.name ?? `#${id}`).join(', '),
+)
+/** Binding (or rebinding) would change something even when the switch is already set up. */
+const bindingChanges = computed(
+  () => bind.value && profileId.value !== null && props.ports.some((p) => p.port_profile_id !== profileId.value),
+)
 const title = computed(() =>
   single.value ? `${t('ports.port')} ${single.value.name}` : t('change.editPorts', props.ports.length),
 )
@@ -54,7 +70,11 @@ const initial = computed<Record<number, Member>>(() => {
 watch(open, async (isOpen) => {
   if (!isOpen) return
   plan.value = null
-  profileId.value = null
+  failure.value = null
+  // bound ports start with their profile (one profile for all), so applying it again is one click
+  const ids = [...new Set(props.ports.map((p) => p.port_profile_id ?? null))]
+  profileId.value = ids.length === 1 ? ids[0]! : null
+  bind.value = profileId.value !== null
   enabled.value = 'keep'
   description.value = single.value?.description ?? ''
   members.value = { ...initial.value }
@@ -73,7 +93,26 @@ watch(initial, (now) => {
 })
 
 // Any edit invalidates the preview.
-watch([profileId, description, enabled, members], () => (plan.value = null), { deep: true })
+watch(
+  [profileId, bind, description, enabled, members],
+  () => {
+    plan.value = null
+    failure.value = null
+  },
+  { deep: true },
+)
+
+/** Runs a request; on failure the reason stays visible in the dialog. */
+async function attempt(action: () => Promise<void>): Promise<boolean> {
+  failure.value = null
+  try {
+    await action()
+    return true
+  } catch (err) {
+    failure.value = err instanceof ApiError ? err.message : String(err)
+    return false
+  }
+}
 
 function set(vid: number, value: Member): void {
   const next = { ...members.value }
@@ -101,10 +140,10 @@ const taggedNow = computed(() => props.vlans.filter((v) => members.value[v.vid] 
 const changedCount = computed(() => props.vlans.filter((v) => changed(v.vid)).length)
 
 const shownVlans = computed(() => {
-  const q = filter.value.trim().toLowerCase()
+  const matches = vlanMatcher(filter.value)
   return props.vlans.filter(
     (v) =>
-      (!q || String(v.vid).startsWith(q) || v.name.toLowerCase().includes(q)) &&
+      matches(v.vid, v.name) &&
       (!onlyAssigned.value || members.value[v.vid] !== 'none' || initial.value[v.vid] !== 'none'),
   )
 })
@@ -112,7 +151,8 @@ const shownVlans = computed(() => {
 function body(): Record<string, unknown> {
   const data: Record<string, unknown> = { port_ids: props.ports.map((p) => p.id) }
   if (enabled.value !== 'keep') data.enabled = enabled.value === 'on'
-  if (profileId.value !== null) return { ...data, profile_id: profileId.value }
+  if (profileId.value !== null) return { ...data, profile_id: profileId.value, bind: bind.value }
+  if (boundPorts.value.length) return data // only on/off, the rest belongs to the profile
   if (single.value && description.value !== single.value.description) data.description = description.value
   if (untaggedTouched.value) {
     if (untaggedNow.value) data.untagged = untaggedNow.value.vid
@@ -133,15 +173,29 @@ function body(): Record<string, unknown> {
 
 async function preview(): Promise<void> {
   busy.value = true
-  await notify.run(async () => {
+  await attempt(async () => {
     plan.value = await api.post<ChangePlan>(`/devices/${props.deviceId}/ports/plan`, body())
   })
   busy.value = false
 }
 
+/** Release the ports from their profile; the switch configuration stays as it is. */
+async function unbind(): Promise<void> {
+  busy.value = true
+  const ok = await notify.run(
+    () => api.post(`/devices/${props.deviceId}/ports/unbind`, { port_ids: boundPorts.value.map((p) => p.id) }),
+    t('change.unbound'),
+  )
+  busy.value = false
+  if (ok) {
+    open.value = false
+    emit('applied')
+  }
+}
+
 async function apply(): Promise<void> {
   busy.value = true
-  const ok = await notify.run(async () => {
+  const ok = await attempt(async () => {
     const result = await api.post<ApplyResult>(`/devices/${props.deviceId}/ports/apply`, body())
     const simulated = result.log.some((line) => line.startsWith('[simulated]'))
     notify.success(simulated ? `${t('change.applied')} – ${t('change.simulated')}` : t('change.applied'))
@@ -176,9 +230,29 @@ const choiceClass: Record<(typeof CHOICES)[number], string> = {
             {{ p.name }} (U {{ p.untagged_vid ?? '–' }}{{ p.tagged_vids.length ? ` / T ${p.tagged_vids.join(',')}` : '' }})
           </option>
         </select>
+        <label v-if="profileId !== null" class="mt-2 flex items-start gap-2 text-sm">
+          <input v-model="bind" type="checkbox" class="mt-0.5 accent-brand-600" />
+          <span>
+            {{ t('change.bind') }}
+            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('change.bindHint') }}</span>
+          </span>
+        </label>
       </div>
 
-      <template v-if="profileId === null">
+      <div
+        v-if="boundPorts.length"
+        class="flex flex-wrap items-center gap-3 rounded-md bg-brand-50 p-3 text-sm text-brand-900 dark:bg-brand-500/10 dark:text-brand-200"
+      >
+        <LinkIcon class="size-5 shrink-0" />
+        <span class="min-w-0 flex-1">
+          {{ t('change.boundInfo', { profile: boundNames }, boundPorts.length) }}
+        </span>
+        <button type="button" class="btn btn-secondary" :disabled="busy" @click="unbind">
+          <LinkSlashIcon class="size-4" /> {{ t('change.unbind') }}
+        </button>
+      </div>
+
+      <template v-if="profileId === null && !boundPorts.length">
         <div v-if="single" class="field">
           <label class="label" for="pe-desc">{{ t('ports.description') }}</label>
           <input id="pe-desc" v-model="description" class="input" maxlength="200" />
@@ -200,7 +274,7 @@ const choiceClass: Record<(typeof CHOICES)[number], string> = {
           <div class="flex flex-wrap items-center gap-3">
             <div class="relative">
               <MagnifyingGlassIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-gray-400" />
-              <input v-model="filter" class="input w-56 pl-8" :placeholder="t('change.vlanFilter')" />
+              <input v-model="filter" class="input w-72 pl-8" :placeholder="t('vlans.search')" />
             </div>
             <label class="flex items-center gap-2 text-sm"><input v-model="onlyAssigned" type="checkbox" class="accent-brand-600" /> {{ t('change.onlyAssigned') }}</label>
           </div>
@@ -258,11 +332,19 @@ const choiceClass: Record<(typeof CHOICES)[number], string> = {
         </div>
       </div>
 
+      <div v-if="failure" role="alert" class="flex gap-2 rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-500/10 dark:text-red-300">
+        <XCircleIcon class="size-5 shrink-0" />
+        <div class="min-w-0">
+          <p class="font-medium">{{ t('change.failed') }}</p>
+          <p class="mt-1 break-words">{{ failure }}</p>
+        </div>
+      </div>
+
       <div v-if="plan" class="space-y-3">
         <div v-for="w in plan.warnings" :key="w" class="flex gap-2 rounded-md p-3 text-sm" :class="w.startsWith('DANGER') ? 'bg-red-50 text-red-800 dark:bg-red-500/10 dark:text-red-300' : 'bg-yellow-50 text-yellow-800 dark:bg-yellow-500/10 dark:text-yellow-300'">
           <ExclamationTriangleIcon class="size-5 shrink-0" /> {{ w }}
         </div>
-        <p v-if="!plan.operations" class="text-sm text-gray-500">{{ t('change.nothing') }}</p>
+        <p v-if="!plan.operations" class="text-sm text-gray-500">{{ bindingChanges ? t('change.onlyBind') : t('change.nothing') }}</p>
         <div v-else>
           <p class="label mb-1.5">{{ t('change.commands') }}</p>
           <pre class="max-h-64 overflow-auto rounded-md bg-gray-900 p-3 font-mono text-xs leading-relaxed text-green-300">{{ plan.commands.join('\n') }}</pre>
@@ -280,7 +362,7 @@ const choiceClass: Record<(typeof CHOICES)[number], string> = {
         type="button"
         class="btn"
         :class="plan.warnings.some((w) => w.startsWith('DANGER')) ? 'btn-danger' : 'btn-primary'"
-        :disabled="busy || !plan.operations"
+        :disabled="busy || (!plan.operations && !bindingChanges)"
         @click="apply"
       >
         <UiSpinner v-if="busy" /> {{ t('change.apply') }}

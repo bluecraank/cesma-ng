@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { CheckCircleIcon, InformationCircleIcon, XCircleIcon } from '@heroicons/vue/24/outline'
 import { XMarkIcon } from '@heroicons/vue/20/solid'
-import { useToasts } from '@/composables/useToasts'
+import { hostsToasts, useToasts } from '@/composables/useToasts'
 
+/** The dialog this toaster belongs to; without, it is the page's toaster. */
+const props = defineProps<{ host?: number | null }>()
 const { toasts, dismiss } = useToasts()
 const icons = { success: CheckCircleIcon, error: XCircleIcon, info: InformationCircleIcon }
 const colors = { success: 'text-green-500', error: 'text-red-500', info: 'text-brand-500' }
 </script>
 
 <template>
-  <div aria-live="assertive" class="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-end gap-3 p-4 sm:p-6">
+  <div v-if="hostsToasts(props.host ?? null)" aria-live="assertive" class="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-end gap-3 p-4 sm:p-6">
     <TransitionGroup
       enter-active-class="transition duration-200 ease-out"
       enter-from-class="translate-y-2 opacity-0"

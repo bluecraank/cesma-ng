@@ -4,10 +4,10 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
-from app.api.deps import CallerDep, Db, RuntimeDep, csrf_guard
-from app.core.errors import NotFoundError
+from app.api.deps import AppSettings, CallerDep, Db, RuntimeDep, csrf_guard
+from app.core.errors import NotFoundError, ValidationFailedError
 from app.domain.changes import ChangePlan
-from app.models import PortProfile
+from app.models import Job, PortProfile
 from app.schemas import (
     ApplyResult,
     BackupOut,
@@ -17,6 +17,7 @@ from app.schemas import (
     JobIn,
     JobOut,
     PortChangeIn,
+    PortIdsIn,
     PortProfileIn,
     PortProfileOut,
     RenameIn,
@@ -51,13 +52,9 @@ async def _port_change(db: Db, caller: Caller, device_id: int, body: PortChangeI
         profile = await db.get(PortProfile, body.profile_id)
         if profile is None or profile.site_id != device.site_id:
             raise NotFoundError("Port profile not found at this site")
-        return PortChange(
-            description=profile.description,
-            enabled=body.enabled,
-            untagged=profile.untagged_vid,
-            tagged=frozenset(profile.tagged_vids),
-            clear_untagged=profile.untagged_vid is None,
-        )
+        return port_config.profile_change(profile, enabled=body.enabled, bind=body.bind)
+    if body.bind:
+        raise ValidationFailedError("Binding needs a port profile")
     return PortChange(
         description=body.description,
         enabled=body.enabled,
@@ -92,6 +89,14 @@ async def apply_ports(
         db, caller, runtime, device_id, body.port_ids, change
     )
     return {"plan": _plan_out(plan), "log": log}
+
+
+@router.post("/devices/{device_id}/ports/unbind")
+async def unbind_ports(
+    device_id: int, body: PortIdsIn, db: Db, caller: CallerDep
+) -> dict[str, int]:
+    """Release ports from their port profile (the switch configuration is not touched)."""
+    return {"released": await port_config.unbind_ports(db, caller, device_id, body.port_ids)}
 
 
 @router.post("/devices/{device_id}/rename/plan", response_model=ChangePlanOut)
@@ -161,9 +166,36 @@ async def plan_vlan_sync(
 # --- Port profiles ---------------------------------------------------------------------------
 
 
+def _profile_out(profile: PortProfile, bound: int, job: Job | None = None) -> PortProfileOut:
+    out = PortProfileOut.model_validate(profile)
+    out.bound_ports = bound
+    out.job_id = job.id if job else None
+    return out
+
+
+async def _save_profile(
+    db: Db, caller: Caller, site_id: int, body: PortProfileIn, profile_id: int | None = None
+) -> PortProfileOut:
+    """Save, and roll a changed profile out to the ports bound to it."""
+    profile, changed = await site_config.save_profile(
+        db, caller, site_id, body.model_dump(), profile_id
+    )
+    bound = (await site_config.bound_port_counts(db, site_id)).get(profile.id, 0)
+    job = (
+        await jobs.enqueue(db, caller, "port_profile", site_id, {"profile_id": profile.id})
+        if changed and bound
+        else None
+    )
+    return _profile_out(profile, bound, job)
+
+
 @router.get("/sites/{site_id}/port-profiles", response_model=list[PortProfileOut])
 async def list_profiles(site_id: int, db: Db, caller: CallerDep) -> object:
-    return await site_config.list_profiles(db, caller, site_id)
+    bound = await site_config.bound_port_counts(db, site_id)
+    return [
+        _profile_out(p, bound.get(p.id, 0))
+        for p in await site_config.list_profiles(db, caller, site_id)
+    ]
 
 
 @router.post(
@@ -172,14 +204,27 @@ async def list_profiles(site_id: int, db: Db, caller: CallerDep) -> object:
     status_code=status.HTTP_201_CREATED,
 )
 async def create_profile(site_id: int, body: PortProfileIn, db: Db, caller: CallerDep) -> object:
-    return await site_config.save_profile(db, caller, site_id, body.model_dump())
+    return await _save_profile(db, caller, site_id, body)
 
 
 @router.put("/sites/{site_id}/port-profiles/{profile_id}", response_model=PortProfileOut)
 async def update_profile(
     site_id: int, profile_id: int, body: PortProfileIn, db: Db, caller: CallerDep
 ) -> object:
-    return await site_config.save_profile(db, caller, site_id, body.model_dump(), profile_id)
+    return await _save_profile(db, caller, site_id, body, profile_id)
+
+
+@router.post(
+    "/sites/{site_id}/port-profiles/{profile_id}/roll-out",
+    response_model=JobOut,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def roll_out_profile(site_id: int, profile_id: int, db: Db, caller: CallerDep) -> object:
+    """Apply the profile again to all bound ports (e.g. after a switch was offline)."""
+    profile = await db.get(PortProfile, profile_id)
+    if profile is None or profile.site_id != site_id:
+        raise NotFoundError("Port profile not found")
+    return await jobs.enqueue(db, caller, "port_profile", site_id, {"profile_id": profile_id})
 
 
 @router.delete(
@@ -227,7 +272,11 @@ async def diff_backups(
 
 
 @router.post("/jobs", response_model=JobOut, status_code=status.HTTP_202_ACCEPTED)
-async def create_job(body: JobIn, db: Db, caller: CallerDep) -> object:
+async def create_job(body: JobIn, db: Db, caller: CallerDep, settings: AppSettings) -> object:
+    if body.kind == "ssh_keys" and not settings.ssh_key_push_enabled:
+        raise ValidationFailedError(
+            "Uploading SSH keys is switched off (CESMA_SSH_KEY_PUSH_ENABLED)"
+        )
     payload = {
         "device_ids": body.device_ids,
         "delete_extra": body.delete_extra,

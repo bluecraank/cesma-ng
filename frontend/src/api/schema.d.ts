@@ -599,6 +599,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/ports/unbind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unbind Ports
+         * @description Release ports from their port profile (the switch configuration is not touched).
+         */
+        post: operations["unbind_ports_api_v1_devices__device_id__ports_unbind_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/rename/plan": {
         parameters: {
             query?: never;
@@ -734,6 +754,26 @@ export interface paths {
         post?: never;
         /** Delete Profile */
         delete: operations["delete_profile_api_v1_sites__site_id__port_profiles__profile_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{site_id}/port-profiles/{profile_id}/roll-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Roll Out Profile
+         * @description Apply the profile again to all bound ports (e.g. after a switch was offline).
+         */
+        post: operations["roll_out_profile_api_v1_sites__site_id__port_profiles__profile_id__roll_out_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1206,6 +1246,26 @@ export interface paths {
         };
         /** Health */
         get: operations["health_api_v1_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/features": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Features
+         * @description Functions that can be switched off in the configuration (the UI hides them).
+         */
+        get: operations["features_api_v1_features_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2007,7 +2067,7 @@ export interface components {
          * PollTask
          * @enum {string}
          */
-        PollTask: "inventory" | "fdb" | "arp" | "lldp" | "counters";
+        PollTask: "inventory" | "fdb" | "arp" | "lldp" | "counters" | "login";
         /** PortChangeIn */
         PortChangeIn: {
             /** Port Ids */
@@ -2037,6 +2097,11 @@ export interface components {
             remove_tagged: number[];
             /** Profile Id */
             profile_id?: number | null;
+            /**
+             * Bind
+             * @default false
+             */
+            bind: boolean;
         };
         /** PortDeviceOut */
         PortDeviceOut: {
@@ -2084,6 +2149,11 @@ export interface components {
             /** Devices */
             devices: components["schemas"]["PortDeviceOut"][];
         };
+        /** PortIdsIn */
+        PortIdsIn: {
+            /** Port Ids */
+            port_ids: number[];
+        };
         /**
          * PortKind
          * @enum {string}
@@ -2128,6 +2198,8 @@ export interface components {
              * @default false
              */
             is_uplink: boolean;
+            /** Port Profile Id */
+            port_profile_id?: number | null;
             /** Neighbor */
             neighbor?: string | null;
             /** Neighbor Device Id */
@@ -2166,6 +2238,13 @@ export interface components {
             tagged_vids: number[];
             /** Description */
             description: string | null;
+            /**
+             * Bound Ports
+             * @default 0
+             */
+            bound_ports: number;
+            /** Job Id */
+            job_id?: number | null;
         };
         /** PortStatPoint */
         PortStatPoint: {
@@ -3901,6 +3980,43 @@ export interface operations {
             };
         };
     };
+    unbind_ports_api_v1_devices__device_id__ports_unbind_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortIdsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     plan_rename_api_v1_devices__device_id__rename_plan_post: {
         parameters: {
             query?: never;
@@ -4291,6 +4407,38 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    roll_out_profile_api_v1_sites__site_id__port_profiles__profile_id__roll_out_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: number;
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -5413,6 +5561,28 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    features_api_v1_features_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
                     };
                 };
             };

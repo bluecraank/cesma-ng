@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import {
   ArrowDownTrayIcon,
+  ArrowPathIcon,
   ArrowPathRoundedSquareIcon,
   ExclamationTriangleIcon,
+  MagnifyingGlassIcon,
   PencilSquareIcon,
   PlusIcon,
   TrashIcon,
@@ -11,15 +13,20 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { api, type ChangePlan, type Job, type PortProfile, type SiteVlan, type SiteVlanIn } from '@/api/client'
+import UiCsvButton from '@/components/ui/UiCsvButton.vue'
 import UiDialog from '@/components/ui/UiDialog.vue'
+import UiSortTh from '@/components/ui/UiSortTh.vue'
 import VlanPicker from '@/components/VlanPicker.vue'
 import UiSpinner from '@/components/ui/UiSpinner.vue'
 import UiToggle from '@/components/ui/UiToggle.vue'
 import { useConfirmDelete } from '@/composables/useConfirm'
 import { useJobWatcher } from '@/composables/useJobWatcher'
 import { useNotify } from '@/composables/useNotify'
+import { useTableSort } from '@/composables/useTableSort'
 import { useAuthStore } from '@/stores/auth'
 import { useSitesStore } from '@/stores/sites'
+import { downloadCsv } from '@/utils/csv'
+import { vlanMatcher } from '@/utils/vlanFilter'
 
 const { t } = useI18n()
 const notify = useNotify()
@@ -44,6 +51,67 @@ async function load(): Promise<void> {
   })
 }
 watch(() => sites.currentId, load, { immediate: true })
+
+// --- Search, filter and sorting (one search field for both tabs) ---
+const search = ref('')
+const FLAGS = ['incomplete', 'mismatch', 'client', 'scan'] as const
+const flag = ref<'' | (typeof FLAGS)[number]>('')
+const hasFlag: Record<(typeof FLAGS)[number], (v: SiteVlan) => boolean> = {
+  incomplete: (v) => v.devices_with_vlan < v.device_count,
+  mismatch: (v) => v.devices_name_mismatch > 0,
+  client: (v) => v.is_client_vlan,
+  scan: (v) => v.scan_enabled,
+}
+const flagLabel = (f: (typeof FLAGS)[number]): string =>
+  f === 'client' ? t('siteVlans.clientVlan') : f === 'scan' ? t('siteVlans.scan') : t(`siteVlans.filter.${f}`)
+
+const filteredVlans = computed(() => {
+  const matches = vlanMatcher(search.value)
+  return vlans.value.filter((v) => matches(v.vid, v.name, v.description, v.ip_range) && (!flag.value || hasFlag[flag.value](v)))
+})
+const { sort: vlanSort, sorted: vlanRows } = useTableSort(() => filteredVlans.value, {
+  vid: (v) => v.vid,
+  name: (v) => v.name,
+  ipRange: (v) => v.ip_range,
+  presence: (v) => (v.device_count ? v.devices_with_vlan / v.device_count : null),
+})
+
+/** A profile matches by its name or by one of its VLANs. */
+const filteredProfiles = computed(() => {
+  const matches = vlanMatcher(search.value)
+  const text = search.value.trim().toLowerCase()
+  return profiles.value.filter(
+    (p) =>
+      !text ||
+      [p.name, p.description].some((s) => s?.toLowerCase().includes(text)) ||
+      [p.untagged_vid, ...p.tagged_vids].some((vid) => vid !== null && matches(vid, vlanName(vid))),
+  )
+})
+const { sort: profileSort, sorted: profileRows } = useTableSort(() => filteredProfiles.value, {
+  name: (p) => p.name,
+  untagged: (p) => p.untagged_vid,
+  tagged: (p) => p.tagged_vids.length || null,
+  description: (p) => p.description,
+  bound: (p) => p.bound_ports || null,
+})
+
+function exportCsv(): void {
+  const site = sites.current?.name ?? ''
+  const yesNo = (value: boolean): string => (value ? t('common.yes') : t('common.no'))
+  if (tab.value === 'vlans') {
+    downloadCsv(
+      `vlans-${site}`,
+      ['VID', t('common.name'), t('ports.description'), t('siteVlans.ipRange'), t('siteVlans.presence'), t('device.title'), t('siteVlans.clientVlan'), t('siteVlans.scan'), t('siteVlans.syncEnabled')],
+      vlanRows.value.map((v) => [v.vid, v.name, v.description, v.ip_range, v.devices_with_vlan, v.device_count, yesNo(v.is_client_vlan), yesNo(v.scan_enabled), yesNo(v.sync_enabled)]),
+    )
+  } else {
+    downloadCsv(
+      `portprofile-${site}`,
+      [t('common.name'), t('siteVlans.untagged'), t('siteVlans.tagged'), t('siteVlans.portDescription')],
+      profileRows.value.map((p) => [p.name, p.untagged_vid, p.tagged_vids.join(', '), p.description]),
+    )
+  }
+}
 
 // --- VLAN dialog ---
 const vlanOpen = ref(false)
@@ -139,17 +207,30 @@ async function saveProfile(): Promise<void> {
     tagged_vids: f.tagged.filter((v) => v !== f.untagged_vid),
     description: f.description || null,
   }
-  const ok = await notify.run(
-    () => (profileId.value ? api.put(`${base.value}/port-profiles/${profileId.value}`, body) : api.post(`${base.value}/port-profiles`, body)),
-    t('common.saved'),
-  )
+  const ok = await notify.run(async () => {
+    const saved = profileId.value
+      ? await api.put<PortProfile>(`${base.value}/port-profiles/${profileId.value}`, body)
+      : await api.post<PortProfile>(`${base.value}/port-profiles`, body)
+    // a changed profile is rolled out to its bound ports in the background
+    if (saved.job_id) {
+      notify.success(t('siteVlans.rollOutStarted', saved.bound_ports))
+      watchJob(await api.get<Job>(`/jobs/${saved.job_id}`))
+    } else notify.success(t('common.saved'))
+  })
   if (ok) {
     profileOpen.value = false
     await load()
   }
 }
+const editedProfile = computed(() => profiles.value.find((p) => p.id === profileId.value) ?? null)
+async function rollOut(p: PortProfile): Promise<void> {
+  await notify.run(async () => {
+    watchJob(await api.post<Job>(`${base.value}/port-profiles/${p.id}/roll-out`))
+    notify.success(t('siteVlans.rollOutStarted', p.bound_ports))
+  })
+}
 async function removeProfile(p: PortProfile): Promise<void> {
-  if (await confirmDelete(p.name)) {
+  if (await confirmDelete(p.bound_ports ? `${p.name} – ${t('siteVlans.deleteBound', { n: p.bound_ports })}` : p.name)) {
     if (await notify.run(() => api.delete(`${base.value}/port-profiles/${p.id}`), t('common.deleted'))) await load()
   }
 }
@@ -173,7 +254,7 @@ async function removeProfile(p: PortProfile): Promise<void> {
     <div v-if="job && (job.status === 'pending' || job.status === 'running')" class="card flex items-center gap-4 p-4">
       <UiSpinner />
       <div class="flex-1">
-        <p class="text-sm font-medium">{{ t('jobs.kinds.vlan_sync') }} · {{ t(`jobs.statuses.${job.status}`) }}</p>
+        <p class="text-sm font-medium">{{ t(`jobs.kinds.${job.kind}`) }} · {{ t(`jobs.statuses.${job.status}`) }}</p>
         <div class="mt-2 h-1.5 rounded-full bg-gray-100 dark:bg-white/10"><div class="h-1.5 rounded-full bg-brand-500 transition-all" :style="{ width: `${job.progress}%` }" /></div>
       </div>
     </div>
@@ -191,20 +272,35 @@ async function removeProfile(p: PortProfile): Promise<void> {
       </button>
     </nav>
 
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="relative">
+        <MagnifyingGlassIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-gray-400" />
+        <input v-model="search" class="input w-72 pl-8" :placeholder="t('vlans.search')" />
+      </div>
+      <select v-if="tab === 'vlans'" v-model="flag" class="input w-56" :aria-label="t('siteVlans.filter.all')">
+        <option value="">{{ t('siteVlans.filter.all') }}</option>
+        <option v-for="f in FLAGS" :key="f" :value="f">{{ flagLabel(f) }}</option>
+      </select>
+      <span class="ml-auto text-sm text-gray-500 dark:text-gray-400">
+        {{ tab === 'vlans' ? `${vlanRows.length} / ${vlans.length}` : `${profileRows.length} / ${profiles.length}` }}
+      </span>
+      <UiCsvButton @click="exportCsv" />
+    </div>
+
     <div v-if="tab === 'vlans'" class="card table-wrap">
       <table class="table">
         <thead>
           <tr>
-            <th>VID</th>
-            <th>{{ t('common.name') }}</th>
-            <th>{{ t('siteVlans.ipRange') }}</th>
-            <th>{{ t('siteVlans.presence') }}</th>
+            <UiSortTh :sort="vlanSort" column="vid">VID</UiSortTh>
+            <UiSortTh :sort="vlanSort" column="name">{{ t('common.name') }}</UiSortTh>
+            <UiSortTh :sort="vlanSort" column="ipRange">{{ t('siteVlans.ipRange') }}</UiSortTh>
+            <UiSortTh :sort="vlanSort" column="presence">{{ t('siteVlans.presence') }}</UiSortTh>
             <th />
             <th v-if="canAdmin" class="w-20" />
           </tr>
         </thead>
         <tbody>
-          <tr v-for="v in vlans" :key="v.id">
+          <tr v-for="v in vlanRows" :key="v.id">
             <td class="font-medium">{{ v.vid }}</td>
             <td>
               <div class="font-medium text-gray-900 dark:text-white">{{ v.name }}</div>
@@ -225,7 +321,7 @@ async function removeProfile(p: PortProfile): Promise<void> {
               <button type="button" class="btn-icon hover:!text-red-600" :title="t('common.delete')" @click="removeVlan(v)"><TrashIcon class="size-4" /></button>
             </td>
           </tr>
-          <tr v-if="!vlans.length"><td colspan="6" class="py-8 text-center text-gray-500">—</td></tr>
+          <tr v-if="!vlanRows.length"><td colspan="6" class="py-8 text-center text-gray-500">—</td></tr>
         </tbody>
       </table>
     </div>
@@ -234,15 +330,16 @@ async function removeProfile(p: PortProfile): Promise<void> {
       <table class="table">
         <thead>
           <tr>
-            <th>{{ t('common.name') }}</th>
-            <th>{{ t('siteVlans.untagged') }}</th>
-            <th>{{ t('siteVlans.tagged') }}</th>
-            <th>{{ t('siteVlans.portDescription') }}</th>
-            <th v-if="canAdmin" class="w-20" />
+            <UiSortTh :sort="profileSort" column="name">{{ t('common.name') }}</UiSortTh>
+            <UiSortTh :sort="profileSort" column="untagged">{{ t('siteVlans.untagged') }}</UiSortTh>
+            <UiSortTh :sort="profileSort" column="tagged">{{ t('siteVlans.tagged') }}</UiSortTh>
+            <UiSortTh :sort="profileSort" column="description">{{ t('siteVlans.portDescription') }}</UiSortTh>
+            <UiSortTh :sort="profileSort" column="bound">{{ t('siteVlans.boundPorts') }}</UiSortTh>
+            <th v-if="canAdmin" class="w-28" />
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in profiles" :key="p.id">
+          <tr v-for="p in profileRows" :key="p.id">
             <td class="font-medium text-gray-900 dark:text-white">{{ p.name }}</td>
             <td class="whitespace-nowrap"><span class="font-medium">{{ p.untagged_vid ?? '–' }}</span> <span class="text-xs text-gray-500">{{ p.untagged_vid ? vlanName(p.untagged_vid) : '' }}</span></td>
             <td class="text-xs">
@@ -251,12 +348,14 @@ async function removeProfile(p: PortProfile): Promise<void> {
               </span>
             </td>
             <td>{{ p.description ?? '' }}</td>
+            <td>{{ p.bound_ports || '' }}</td>
             <td v-if="canAdmin" class="whitespace-nowrap">
+              <button v-if="p.bound_ports" type="button" class="btn-icon" :title="t('siteVlans.rollOut')" @click="rollOut(p)"><ArrowPathIcon class="size-4" /></button>
               <button type="button" class="btn-icon" :title="t('common.edit')" @click="editProfile(p)"><PencilSquareIcon class="size-4" /></button>
               <button type="button" class="btn-icon hover:!text-red-600" :title="t('common.delete')" @click="removeProfile(p)"><TrashIcon class="size-4" /></button>
             </td>
           </tr>
-          <tr v-if="!profiles.length"><td colspan="5" class="py-8 text-center text-gray-500">—</td></tr>
+          <tr v-if="!profileRows.length"><td colspan="6" class="py-8 text-center text-gray-500">—</td></tr>
         </tbody>
       </table>
     </div>
@@ -341,6 +440,9 @@ async function removeProfile(p: PortProfile): Promise<void> {
           <label class="label" for="pp-desc">{{ t('siteVlans.portDescription') }}</label>
           <input id="pp-desc" v-model="profileForm.description" class="input" />
         </div>
+        <p v-if="editedProfile?.bound_ports" class="rounded-md bg-brand-50 p-3 text-sm text-brand-900 dark:bg-brand-500/10 dark:text-brand-200">
+          {{ t('siteVlans.boundPortsHint', editedProfile.bound_ports) }}
+        </p>
       </form>
       <template #footer>
         <button type="button" class="btn btn-secondary" @click="profileOpen = false">{{ t('common.cancel') }}</button>

@@ -92,6 +92,7 @@ def interval(settings: Settings, task: PollTask) -> timedelta:
         PollTask.ARP: settings.poll_arp_interval,
         PollTask.LLDP: settings.poll_lldp_interval,
         PollTask.COUNTERS: settings.poll_counters_interval,
+        PollTask.LOGIN: settings.poll_login_interval,
     }[task]
     return timedelta(seconds=seconds)
 
@@ -142,7 +143,10 @@ async def poll_device(
     state.last_run_at = utcnow()
     try:
         async with asyncio.timeout(settings.poll_timeout):
-            await _run(db, device, task, driver)
+            if task is PollTask.LOGIN:
+                await config_writer(settings, device, credentials).test_login()
+            else:
+                await _run(db, device, task, driver)
     except Exception as exc:  # any failure of one device must not stop the worker
         await db.rollback()
         device = await db.get(Device, device_id)

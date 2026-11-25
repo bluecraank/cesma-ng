@@ -4,7 +4,7 @@ import ipaddress
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -268,6 +268,8 @@ async def _uplink_tagging(db: AsyncSession, device: Device, vids: set[int]) -> l
     )
     ops: list[SetPortVlans] = []
     for port in ports:
+        if port.port_profile_id is not None:
+            continue  # bound ports are changed only through their profile
         untagged = next((v.vid for v in port.vlans if not v.tagged), None)
         tagged = frozenset(v.vid for v in port.vlans if v.tagged)
         missing = vids - tagged - ({untagged} if untagged else set())
@@ -292,17 +294,35 @@ async def list_profiles(db: AsyncSession, caller: Caller, site_id: int) -> Seque
     )
 
 
+async def bound_port_counts(db: AsyncSession, site_id: int) -> dict[int, int]:
+    """Number of ports bound to each profile of the site."""
+    rows = await db.execute(
+        select(Port.port_profile_id, func.count())
+        .join(PortProfile, PortProfile.id == Port.port_profile_id)
+        .where(PortProfile.site_id == site_id)
+        .group_by(Port.port_profile_id)
+    )
+    return {pid: count for pid, count in rows if pid is not None}
+
+
+def _profile_state(profile: PortProfile) -> tuple[object, ...]:
+    """What a profile sets on its ports (the name does not matter for them)."""
+    return (profile.untagged_vid, tuple(profile.tagged_vids or ()), profile.description)
+
+
 async def save_profile(
     db: AsyncSession,
     caller: Caller,
     site_id: int,
     values: dict[str, Any],
     profile_id: int | None = None,
-) -> PortProfile:
+) -> tuple[PortProfile, bool]:
+    """Create or update a profile; returns it and whether its port settings changed."""
     require_permission(caller.user, site_id, Permission.VLANS_MANAGE)
     profile = await db.get(PortProfile, profile_id) if profile_id else PortProfile(site_id=site_id)
     if profile is None or profile.site_id != site_id:
         raise NotFoundError("Port profile not found")
+    before = _profile_state(profile) if profile_id else None
     profile.name = values["name"]
     profile.untagged_vid = values.get("untagged_vid")
     profile.tagged_vids = sorted(set(values.get("tagged_vids") or []) - {profile.untagged_vid})
@@ -317,7 +337,7 @@ async def save_profile(
     await audit.record(
         db, caller.actor, "port_profile.save", f"Port profile {profile.name} saved", site_id=site_id
     )
-    return profile
+    return profile, before is not None and before != _profile_state(profile)
 
 
 async def delete_profile(db: AsyncSession, caller: Caller, site_id: int, profile_id: int) -> None:
@@ -325,6 +345,10 @@ async def delete_profile(db: AsyncSession, caller: Caller, site_id: int, profile
     profile = await db.get(PortProfile, profile_id)
     if profile is None or profile.site_id != site_id:
         raise NotFoundError("Port profile not found")
+    # the ports keep their configuration on the switch, they are only released
+    await db.execute(
+        update(Port).where(Port.port_profile_id == profile.id).values(port_profile_id=None)
+    )
     await db.delete(profile)
     await audit.record(
         db,

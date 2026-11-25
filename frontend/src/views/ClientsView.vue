@@ -5,9 +5,12 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { api, type ClientPage, type ClientRow } from '@/api/client'
 import MacTypeIcon from '@/components/MacTypeIcon.vue'
+import UiCsvButton from '@/components/ui/UiCsvButton.vue'
+import UiSpinner from '@/components/ui/UiSpinner.vue'
 import { useNotify } from '@/composables/useNotify'
 import { useSitesStore } from '@/stores/sites'
 import { shortVendor } from '@/utils/vendor'
+import { csvDate, downloadCsv } from '@/utils/csv'
 import { formatDateTime } from '@/utils/format'
 
 const PAGE_SIZE = 100
@@ -40,6 +43,45 @@ async function load(): Promise<void> {
     rows.value = page.items
     total.value = page.total
   })
+}
+
+// The export covers every match of the current search, not only the page shown.
+const EXPORT_PAGE = 500
+const exporting = ref(false)
+async function exportCsv(): Promise<void> {
+  exporting.value = true
+  await notify.run(async () => {
+    const all: ClientRow[] = []
+    for (let from = 0, count = 1; from < count; from += EXPORT_PAGE) {
+      const page = await api.get<ClientPage>('/clients', {
+        q: query.value,
+        site_id: sites.currentId,
+        active_only: activeOnly.value,
+        limit: EXPORT_PAGE,
+        offset: from,
+      })
+      all.push(...page.items)
+      count = page.items.length ? page.total : 0
+    }
+    downloadCsv(
+      `clients-${sites.current?.name ?? ''}`,
+      [t('clients.hostname'), t('clients.ip'), t('clients.mac'), t('clients.vendor'), t('clients.type'), t('clients.vlan'), t('device.title'), t('ports.port'), t('clients.active'), t('clients.firstSeen'), t('clients.lastSeen')],
+      all.map((c) => [
+        c.hostname,
+        c.ip_address,
+        c.mac_address,
+        c.vendor,
+        c.type_name,
+        c.vid,
+        c.device_name,
+        c.port_name,
+        c.active ? t('common.yes') : t('common.no'),
+        csvDate(c.first_seen_at),
+        csvDate(c.last_seen_at),
+      ]),
+    )
+  })
+  exporting.value = false
 }
 
 function go(delta: number): void {
@@ -85,6 +127,7 @@ watch(
           <MagnifyingGlassIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-gray-400" />
           <input v-model="query" class="input w-80 pl-8" :placeholder="t('common.search')" autofocus />
         </div>
+        <UiCsvButton :disabled="exporting || !total" @click="exportCsv"><UiSpinner v-if="exporting" class="size-4" /></UiCsvButton>
       </div>
     </div>
 

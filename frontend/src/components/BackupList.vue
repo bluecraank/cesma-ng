@@ -3,6 +3,8 @@
 import { ArrowDownTrayIcon, ArrowUturnLeftIcon, ArrowsRightLeftIcon } from '@heroicons/vue/20/solid'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import UiSortTh from '@/components/ui/UiSortTh.vue'
+import { useTableSort } from '@/composables/useTableSort'
 import { api, type Backup, type Job } from '@/api/client'
 import { useJobWatcher } from '@/composables/useJobWatcher'
 import UiDialog from '@/components/ui/UiDialog.vue'
@@ -11,6 +13,14 @@ import { useAuthStore } from '@/stores/auth'
 import { formatDateTime } from '@/utils/format'
 
 const props = defineProps<{ backups: Backup[]; showDevice?: boolean }>()
+// Without a chosen column: newest first, as delivered.
+const { sort, sorted } = useTableSort(() => props.backups, {
+  time: (b) => b.created_at,
+  device: (b) => b.device_name,
+  status: (b) => (b.status === 'failed' ? 0 : b.changed ? 1 : 2),
+  size: (b) => (b.status === 'ok' ? b.size : null),
+  by: (b) => b.created_by,
+})
 const auth = useAuthStore()
 const { t, locale } = useI18n()
 const notify = useNotify()
@@ -72,16 +82,16 @@ function size(bytes: number): string {
     <table class="table">
       <thead>
         <tr>
-          <th>{{ t('audit.time') }}</th>
-          <th v-if="showDevice">{{ t('device.title') }}</th>
-          <th>{{ t('device.status') }}</th>
-          <th class="text-right">{{ t('backups.size') }}</th>
-          <th>{{ t('backups.by') }}</th>
+          <UiSortTh :sort="sort" column="time">{{ t('audit.time') }}</UiSortTh>
+          <UiSortTh v-if="showDevice" :sort="sort" column="device">{{ t('device.title') }}</UiSortTh>
+          <UiSortTh :sort="sort" column="status">{{ t('device.status') }}</UiSortTh>
+          <UiSortTh :sort="sort" column="size" class="!text-right">{{ t('backups.size') }}</UiSortTh>
+          <UiSortTh :sort="sort" column="by">{{ t('backups.by') }}</UiSortTh>
           <th class="w-24" />
         </tr>
       </thead>
       <tbody>
-        <tr v-for="b in backups" :key="b.id">
+        <tr v-for="b in sorted" :key="b.id">
           <td class="whitespace-nowrap tabular-nums">{{ formatDateTime(b.created_at, locale) }}</td>
           <td v-if="showDevice">
             <RouterLink :to="{ name: 'device', params: { id: b.device_id }, query: { tab: 'backups' } }" class="link">{{ b.device_name }}</RouterLink>

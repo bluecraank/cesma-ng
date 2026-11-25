@@ -247,6 +247,8 @@ class PortOut(ORM):
     untagged_vlans: list[int] = []
     tagged_vlans: list[int] = []
     is_uplink: bool = False
+    #: bound to this port profile: changed only through the profile
+    port_profile_id: int | None = None
     neighbor: str | None = None
     neighbor_device_id: int | None = None
     mac_count: int = 0
@@ -399,6 +401,12 @@ class PortChangeIn(BaseModel):
     add_tagged: list[Annotated[int, Field(ge=1, le=4094)]] = []
     remove_tagged: list[Annotated[int, Field(ge=1, le=4094)]] = []
     profile_id: int | None = None  # apply a port profile (overrides VLAN/description fields)
+    #: bind the ports to the profile: later profile changes are applied to them automatically
+    bind: bool = False
+
+
+class PortIdsIn(BaseModel):
+    port_ids: list[int] = Field(min_length=1, max_length=200)
 
 
 class RenameIn(BaseModel):
@@ -463,6 +471,10 @@ class PortProfileOut(ORM):
     untagged_vid: int | None
     tagged_vids: list[int]
     description: str | None
+    #: ports bound to the profile
+    bound_ports: int = 0
+    #: job that rolls a change out to the bound ports (only in the answer to a save)
+    job_id: int | None = None
 
 
 class BackupOut(BaseModel):

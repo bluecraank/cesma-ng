@@ -65,7 +65,9 @@ const tabLabels = computed<Record<Tab, string>>(() => ({
 const siteId = computed(() => device.value?.site_id)
 const canManage = computed(() => auth.can('devices.manage', siteId.value))
 const canEditPorts = computed(() => auth.can('ports.edit', siteId.value))
-const canPushKeys = computed(() => auth.can('ssh_keys.push', siteId.value) && !!device.value?.supports_ssh_keys)
+const canPushKeys = computed(
+  () => auth.features.ssh_key_push && auth.can('ssh_keys.push', siteId.value) && !!device.value?.supports_ssh_keys,
+)
 const TABS = computed(() => ALL_TABS.filter((name) => name !== 'console' || auth.can('console', siteId.value)))
 const roomLabel = computed(
   () => sites.rooms(device.value?.site_id ?? null).find((r) => r.id === device.value?.room_id)?.label,
@@ -227,6 +229,7 @@ watch(() => props.id, load, { immediate: true })
       v-if="tab === 'ports'"
       :device-id="device.id"
       :site-id="device.site_id"
+      :device-name="device.name"
       :ports="ports"
       :vlans="vlans"
       :can-edit="canEditPorts"
@@ -236,7 +239,7 @@ watch(() => props.id, load, { immediate: true })
     />
     <ConsoleTab v-else-if="tab === 'console'" :device-id="device.id" :model="device.model" />
     <BackupList v-else-if="tab === 'backups'" :backups="backups" />
-    <SimpleTabs v-else-if="tab !== 'details'" :tab="tab" :vlans="vlans" :fdb="fdb" :lldp="lldp" :poll="poll" />
+    <SimpleTabs v-else-if="tab !== 'details'" :tab="tab" :device-name="device.name" :vlans="vlans" :fdb="fdb" :lldp="lldp" :poll="poll" />
     <section v-else class="card">
       <dl class="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-3 dark:divide-white/5">
         <div v-for="f in facts" :key="f.label" class="px-5 py-3">

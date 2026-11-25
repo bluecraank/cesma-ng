@@ -53,11 +53,16 @@ class SshCli:
     ) -> "SshCli":
         import asyncssh
 
-        keys = (
-            [asyncssh.import_private_key(credentials.private_key)]
-            if credentials.private_key
-            else None
-        )
+        try:
+            keys = (
+                [asyncssh.import_private_key(credentials.private_key)]
+                if credentials.private_key
+                else None
+            )
+        except (asyncssh.KeyImportError, ValueError) as exc:
+            raise CliError(
+                f"The private SSH key of the credential profile is invalid: {exc}"
+            ) from exc
         try:
             conn = await asyncio.wait_for(
                 asyncssh.connect(
@@ -75,14 +80,18 @@ class SshCli:
             raise CliError(f"SSH to {host} failed: {exc}") from exc
         cli = cls(process, prompt)
         cli._conn = conn
-        await cli._read_until_prompt(
-            read_timeout=connect_timeout, answer_password=credentials.password
-        )
-        if credentials.enable_password is not None or "enable" in setup:
-            await cli._enable(credentials.enable_password)
-        for command in setup:
-            if command != "enable":
-                await cli.run(command)
+        try:
+            await cli._read_until_prompt(
+                read_timeout=connect_timeout, answer_password=credentials.password
+            )
+            if credentials.enable_password is not None or "enable" in setup:
+                await cli._enable(credentials.enable_password)
+            for command in setup:
+                if command != "enable":
+                    await cli.run(command)
+        except BaseException:
+            await cli.close()  # e.g. login prompt again (wrong password): do not leak the session
+            raise
         return cli
 
     async def _enable(self, password: str | None) -> None:

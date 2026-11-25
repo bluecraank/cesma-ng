@@ -1,17 +1,25 @@
 <script setup lang="ts">
-import { BoltIcon, ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PencilSquareIcon, XMarkIcon } from '@heroicons/vue/20/solid'
+import { BoltIcon, LinkIcon, ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PencilSquareIcon, XMarkIcon } from '@heroicons/vue/20/solid'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api, type DeviceVlan, type FdbEntry, type Port } from '@/api/client'
 import PortEditDialog from './PortEditDialog.vue'
+import UiColumnMenu from '@/components/ui/UiColumnMenu.vue'
+import UiCsvButton from '@/components/ui/UiCsvButton.vue'
+import UiSortTh from '@/components/ui/UiSortTh.vue'
+import { useColumns } from '@/composables/useColumns'
+import { useTableSort } from '@/composables/useTableSort'
 import TrafficChart from './TrafficChart.vue'
 import type { components } from '@/api/schema'
+import { csvDate, downloadCsv } from '@/utils/csv'
 import { formatDateTime } from '@/utils/format'
 import { shortVendor } from '@/utils/vendor'
 
 const props = defineProps<{
   deviceId: number
   siteId: number
+  /** for the name of the CSV file */
+  deviceName?: string
   ports: Port[]
   vlans: DeviceVlan[]
   canEdit: boolean
@@ -89,7 +97,7 @@ function onApplied(): void {
   emit('changed')
 }
 
-const rows = computed(() => {
+const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
   return props.ports.filter(
     (p) =>
@@ -101,6 +109,45 @@ const rows = computed(() => {
         )),
   )
 })
+
+// Without a chosen column the ports stay in the order of the switch.
+const { sort, sorted: rows } = useTableSort(() => filtered.value, {
+  name: (p) => p.name,
+  status: (p) => (!p.admin_up ? -1 : p.oper_up ? (p.speed_mbps ?? 0) + 1 : 0),
+  description: (p) => p.description,
+  untagged: (p) => p.untagged_vlans[0],
+  tagged: (p) => p.tagged_vlans.length || null,
+  poe: (p) => p.poe,
+  neighbor: (p) => p.neighbor,
+  macs: (p) => p.mac_count || null,
+  lastChange: (p) => p.last_change_at,
+})
+
+// Port and status always stay; everything else can be hidden.
+const OPTIONAL = ['description', 'untagged', 'tagged', 'poe', 'neighbor', 'macs', 'lastChange'] as const
+const cols = useColumns<(typeof OPTIONAL)[number]>('ports')
+const optionalColumns = computed(() => OPTIONAL.map((key) => ({ key, label: t(`ports.${key}`) })))
+const shownOptional = computed(() => OPTIONAL.filter((key) => cols.shows(key)).length)
+
+/** All columns of the ports currently shown, whatever is hidden on screen. */
+function exportCsv(): void {
+  downloadCsv(
+    `ports-${props.deviceName ?? props.deviceId}`,
+    [t('ports.port'), t('ports.status'), t('ports.speed'), t('ports.description'), t('ports.untagged'), t('ports.tagged'), t('ports.poe'), t('ports.neighbor'), t('ports.macs'), t('ports.lastChange')],
+    rows.value.map((p) => [
+      p.name,
+      !p.admin_up ? t('ports.adminDown') : p.oper_up ? t('ports.up') : t('ports.down'),
+      p.oper_up ? p.speed_mbps : null,
+      p.description,
+      p.untagged_vlans.join(', '),
+      p.tagged_vlans.join(', '),
+      p.poe ? t(`ports.poeStates.${p.poe}`) : '',
+      p.neighbor,
+      p.mac_count,
+      csvDate(p.last_change_at),
+    ]),
+  )
+}
 
 async function toggle(port: Port): Promise<void> {
   if (expanded.value === port.id) {
@@ -157,6 +204,8 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
       <label class="flex items-center gap-2 text-sm"><input v-model="onlyUp" type="checkbox" class="rounded accent-brand-600" /> {{ t('ports.onlyUp') }}</label>
       <label class="flex items-center gap-2 text-sm"><input v-model="onlyUplinks" type="checkbox" class="rounded accent-brand-600" /> {{ t('ports.onlyUplinks') }}</label>
       <span class="ml-auto text-sm text-gray-500 dark:text-gray-400">{{ rows.length }} / {{ ports.length }}</span>
+      <UiColumnMenu :columns="optionalColumns" :state="cols" />
+      <UiCsvButton :disabled="!rows.length" @click="exportCsv" />
     </div>
 
     <!-- Selection bar: stays visible while scrolling through long port lists -->
@@ -187,15 +236,15 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
               <input type="checkbox" class="accent-brand-600" :title="t('change.selectAll')" :checked="selected.size > 0 && selected.size === rows.length" @change="toggleAll" />
             </th>
             <th class="w-6" />
-            <th>{{ t('ports.port') }}</th>
-            <th>{{ t('ports.status') }}</th>
-            <th>{{ t('ports.description') }}</th>
-            <th>{{ t('ports.untagged') }}</th>
-            <th>{{ t('ports.tagged') }}</th>
-            <th>{{ t('ports.poe') }}</th>
-            <th>{{ t('ports.neighbor') }}</th>
-            <th class="text-right">{{ t('ports.macs') }}</th>
-            <th>{{ t('ports.lastChange') }}</th>
+            <UiSortTh :sort="sort" column="name">{{ t('ports.port') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="status">{{ t('ports.status') }}</UiSortTh>
+            <UiSortTh v-if="cols.shows('description')" :sort="sort" column="description">{{ t('ports.description') }}</UiSortTh>
+            <UiSortTh v-if="cols.shows('untagged')" :sort="sort" column="untagged">{{ t('ports.untagged') }}</UiSortTh>
+            <UiSortTh v-if="cols.shows('tagged')" :sort="sort" column="tagged">{{ t('ports.tagged') }}</UiSortTh>
+            <UiSortTh v-if="cols.shows('poe')" :sort="sort" column="poe">{{ t('ports.poe') }}</UiSortTh>
+            <UiSortTh v-if="cols.shows('neighbor')" :sort="sort" column="neighbor">{{ t('ports.neighbor') }}</UiSortTh>
+            <UiSortTh v-if="cols.shows('macs')" :sort="sort" column="macs" class="!text-right">{{ t('ports.macs') }}</UiSortTh>
+            <UiSortTh v-if="cols.shows('lastChange')" :sort="sort" column="lastChange">{{ t('ports.lastChange') }}</UiSortTh>
             <th v-if="canEdit" class="w-8" />
           </tr>
         </thead>
@@ -221,28 +270,29 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
                 {{ p.name }}
                 <span v-if="p.kind === 'lag'" class="badge badge-brand ml-1 font-sans">{{ t('ports.lag') }}</span>
                 <span v-else-if="p.is_uplink" class="badge badge-blue ml-1 font-sans">{{ t('ports.uplink') }}</span>
+                <LinkIcon v-if="p.port_profile_id != null" class="ml-1 inline size-3.5 text-brand-600 dark:text-brand-400" :title="t('ports.bound')" />
               </td>
               <td class="whitespace-nowrap">
                 <span v-if="!p.admin_up" class="badge badge-gray">{{ t('ports.adminDown') }}</span>
                 <span v-else-if="p.oper_up" class="badge badge-green">{{ t('ports.up') }} {{ speed(p.speed_mbps) }}</span>
                 <span v-else class="badge badge-gray">{{ t('ports.down') }}</span>
               </td>
-              <td class="max-w-56 truncate" :title="p.description">{{ p.description }}</td>
-              <td class="whitespace-nowrap">
+              <td v-if="cols.shows('description')" class="max-w-56 truncate" :title="p.description">{{ p.description }}</td>
+              <td v-if="cols.shows('untagged')" class="whitespace-nowrap">
                 {{ p.untagged_vlans.join(', ') }}
               </td>
-              <td class="text-gray-500" :title="p.tagged_vlans.join(', ')">{{ vlanList(p.tagged_vlans) }}</td>
-              <td>
+              <td v-if="cols.shows('tagged')" class="text-gray-500" :title="p.tagged_vlans.join(', ')">{{ vlanList(p.tagged_vlans) }}</td>
+              <td v-if="cols.shows('poe')">
                 <span v-if="p.poe" class="badge" :class="poeBadge[p.poe]">
                   <BoltIcon v-if="p.poe === 'delivering'" class="size-3" />{{ t(`ports.poeStates.${p.poe}`) }}
                 </span>
               </td>
-              <td class="max-w-48 truncate" @click.stop>
+              <td v-if="cols.shows('neighbor')" class="max-w-48 truncate" @click.stop>
                 <RouterLink v-if="p.neighbor_device_id" :to="{ name: 'device', params: { id: p.neighbor_device_id } }" class="link">{{ p.neighbor }}</RouterLink>
                 <span v-else :title="p.neighbor ?? ''">{{ p.neighbor }}</span>
               </td>
-              <td class="text-right tabular-nums">{{ p.mac_count || '' }}</td>
-              <td class="text-xs whitespace-nowrap text-gray-500 tabular-nums dark:text-gray-400">
+              <td v-if="cols.shows('macs')" class="text-right tabular-nums">{{ p.mac_count || '' }}</td>
+              <td v-if="cols.shows('lastChange')" class="text-xs whitespace-nowrap text-gray-500 tabular-nums dark:text-gray-400">
                 {{ p.last_change_at ? formatDateTime(p.last_change_at, locale) : '' }}
               </td>
               <td v-if="canEdit" @click.stop>
@@ -251,7 +301,7 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
             </tr>
             <tr v-if="expanded === p.id" class="bg-gray-50 hover:bg-gray-50 dark:bg-white/[0.02]">
               <td :colspan="canEdit ? 2 : 1" />
-              <td :colspan="canEdit ? 10 : 9" class="py-3">
+              <td :colspan="shownOptional + (canEdit ? 3 : 2)" class="py-3">
                 <div class="grid gap-x-8 gap-y-1 text-xs sm:grid-cols-2 lg:grid-cols-4">
                   <div><span class="text-gray-500">ifIndex:</span> {{ p.if_index }}</div>
                   <div><span class="text-gray-500">PVID:</span> {{ p.pvid ?? '—' }}</div>

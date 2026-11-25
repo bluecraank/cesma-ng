@@ -45,6 +45,15 @@ def create_app(
     async def domain_error_handler(_: Request, exc: DomainError) -> JSONResponse:
         return JSONResponse({"detail": exc.message}, status_code=exc.status_code)
 
+    @app.exception_handler(Exception)
+    async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
+        """A bug: still tell the user what failed instead of a bare "HTTP 500"."""
+        logging.getLogger("app").error(
+            "Unhandled error in %s %s", request.method, request.url.path, exc_info=exc
+        )
+        message = f"Internal error ({type(exc).__name__}): {exc}"[:500]
+        return JSONResponse({"detail": message}, status_code=500)
+
     v1 = APIRouter(prefix="/api/v1")
     for module in (auth, org, devices, inventory, config, clients, notifications, admin, audit):
         v1.include_router(module.router)
@@ -52,6 +61,12 @@ def create_app(
     @v1.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
         return {"status": "ok", "version": APP_VERSION}
+
+    @v1.get("/features", tags=["system"])
+    async def features(request: Request) -> dict[str, bool]:
+        """Functions that can be switched off in the configuration (the UI hides them)."""
+        current: Settings = request.app.state.settings
+        return {"ssh_key_push": current.ssh_key_push_enabled}
 
     app.include_router(v1)
     return app

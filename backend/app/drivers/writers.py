@@ -104,6 +104,10 @@ class ConfigWriter(ABC):
     @abstractmethod
     async def running_config(self) -> str: ...
 
+    @abstractmethod
+    async def test_login(self) -> None:
+        """Log in the way changes do, and out again; raises WriteError if that fails."""
+
     async def push_ssh_keys(self, keys: Sequence[str]) -> int:
         """Put the key list on the switch (replacing what was there); returns how many keys
         the switch now holds from Cesma."""
@@ -147,6 +151,13 @@ class CliWriter(ConfigWriter):
     async def _ssh(self) -> Cli:
         return await SshCli.connect(self.host, self.credentials.ssh, setup=self.setup)
 
+    async def _open(self) -> Cli:
+        """Log in; a failed login (wrong password, unreachable) is a WriteError like the rest."""
+        try:
+            return await self._cli_factory()
+        except CliError as exc:
+            raise WriteError(str(exc)) from exc
+
     def render(self, operations: Sequence[Operation]) -> list[str]:
         lines: list[str] = []
         for op in operations:
@@ -159,12 +170,19 @@ class CliWriter(ConfigWriter):
     async def apply(self, operations: Sequence[Operation]) -> list[str]:
         return await self._configure(self.render(operations))
 
+    async def test_login(self) -> None:
+        try:
+            cli = await self._open()
+        except WriteError as exc:
+            raise WriteError(f"SSH login as {self.credentials.ssh.username} failed: {exc}") from exc
+        await cli.close()
+
     async def _configure(self, commands: Sequence[str]) -> list[str]:
         """configure / commands / end / save; stops at the first rejected command."""
         if not commands:
             return []
         log: list[str] = []
-        cli = await self._cli_factory()
+        cli = await self._open()
         try:
             await cli.run("configure")
             for command in commands:
@@ -182,7 +200,7 @@ class CliWriter(ConfigWriter):
         return log
 
     async def run_show(self, command: str) -> str:
-        cli = await self._cli_factory()
+        cli = await self._open()
         try:
             return await cli.run(command, read_timeout=120)
         except CliError as exc:
@@ -191,7 +209,7 @@ class CliWriter(ConfigWriter):
             await cli.close()
 
     async def running_config(self) -> str:
-        cli = await self._cli_factory()
+        cli = await self._open()
         try:
             return await cli.run(self.show_config_command, read_timeout=180)
         except CliError as exc:
@@ -430,6 +448,13 @@ class ArubaOsRestWriter(RestWriter):
                     result.append(RestCall("PUT", "/system", {"name": name}))
         return result
 
+    async def test_login(self) -> None:
+        try:
+            session = await self._session()
+        except WriteError as exc:
+            raise WriteError(f"API login as {self.credentials.api.username} failed: {exc}") from exc
+        await session.logout()
+
     async def _session(self) -> "_ArubaOsSession":
         http = self._http_factory(self.base_url)
         try:
@@ -626,6 +651,13 @@ class ArubaCxRestWriter(RestWriter):
             raise WriteError(str(exc)) from exc
         return http, api
 
+    async def test_login(self) -> None:
+        try:
+            http, api = await self._session()
+        except WriteError as exc:
+            raise WriteError(f"API login as {self.credentials.api.username} failed: {exc}") from exc
+        await self._logout(http, api)
+
     #: copying the running to the startup configuration can take a while on AOS-CX
     SAVE_TIMEOUT: ClassVar[float] = 120
 
@@ -732,6 +764,9 @@ class SimulatedWriter(ConfigWriter):
 
     async def apply(self, operations: Sequence[Operation]) -> list[str]:
         return [f"[simulated] {line}" for line in self.render(operations)]
+
+    async def test_login(self) -> None:
+        return None
 
     async def running_config(self) -> str:
         return self._config or f"! simulated configuration of {self.host}\n"

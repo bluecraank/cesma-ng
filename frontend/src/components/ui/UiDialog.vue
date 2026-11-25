@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { XMarkIcon } from '@heroicons/vue/20/solid'
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
+import UiToaster from '@/components/ui/UiToaster.vue'
+import { closeDialog, openDialog } from '@/composables/useToasts'
 
 defineProps<{ title?: string; wide?: boolean }>()
 const open = defineModel<boolean>('open', { required: true })
 const dialog = ref<HTMLDialogElement | null>(null)
+/** While open, toasts appear inside this dialog (see useToasts). */
+const host = ref<number | null>(null)
 
 // Native <dialog>: focus trap, Escape and backdrop come from the browser.
 watch(
@@ -16,6 +20,18 @@ watch(
   },
   { immediate: true },
 )
+watch(
+  open,
+  (isOpen) => {
+    if (isOpen && host.value === null) host.value = openDialog()
+    if (!isOpen && host.value !== null) {
+      closeDialog(host.value)
+      host.value = null
+    }
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => host.value !== null && closeDialog(host.value))
 </script>
 
 <template>
@@ -40,5 +56,6 @@ watch(
         <slot name="footer" />
       </footer>
     </div>
+    <UiToaster v-if="open && host !== null" :host="host" />
   </dialog>
 </template>

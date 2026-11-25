@@ -52,6 +52,8 @@ const RULES: Record<string, Rule> = {
   'mac_type.delete': named('MAC type', 'MAC-Typ', 'deleted', 'gelöscht'),
   'mac_type.save': [/^MAC type (?<details>.+)$/s, (g) => `MAC-Typ gespeichert: ${g.details}`],
   'port.update': [/^(?<device>.+?): (?<ports>.+) changed$/s, (g) => `${g.device}: ${g.ports} geändert`],
+  'port.bind': [/^(?<device>.+?): (?<ports>.+) bound to port profile (?<profile>.+)$/s, (g) => `${g.device}: ${g.ports} an Port-Profil ${g.profile} gebunden`],
+  'port.unbind': [/^(?<device>.+?): (?<ports>.+) released from port profile$/s, (g) => `${g.device}: Bindung von ${g.ports} an das Port-Profil gelöst`],
   'port.update_failed': [/^(?<device>.+?): (?<error>.+)$/s, (g) => `Portänderung an ${g.device} fehlgeschlagen: ${g.error}`],
   'port_profile.delete': named('Port profile', 'Port-Profil', 'deleted', 'gelöscht'),
   'port_profile.save': named('Port profile', 'Port-Profil', 'saved', 'gespeichert'),

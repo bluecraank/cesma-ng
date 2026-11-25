@@ -2,6 +2,8 @@
 import { ClipboardDocumentIcon, KeyIcon, PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/vue/20/solid'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import UiSortTh from '@/components/ui/UiSortTh.vue'
+import { useTableSort } from '@/composables/useTableSort'
 import { api, type CredentialProfile, type CredentialProfileIn } from '@/api/client'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import UiToggle from '@/components/ui/UiToggle.vue'
@@ -24,6 +26,12 @@ const SECRET_KEYS = [
 ] as const
 
 const profiles = ref<CredentialProfile[]>([])
+const { sort, sorted } = useTableSort(() => profiles.value, {
+  name: (p) => p.name,
+  snmp: (p) => p.snmp_version,
+  api: (p) => p.api_username,
+  ssh: (p) => p.ssh_username,
+})
 const editingId = ref<number | null>(null)
 const open = ref(false)
 const form = ref<CredentialProfileIn>(emptyForm())
@@ -127,16 +135,16 @@ onMounted(load)
       <table class="table">
         <thead>
           <tr>
-            <th>{{ t('common.name') }}</th>
-            <th>{{ t('credentials.snmp') }}</th>
-            <th>{{ t('credentials.api') }}</th>
-            <th>{{ t('credentials.ssh') }}</th>
+            <UiSortTh :sort="sort" column="name">{{ t('common.name') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="snmp">{{ t('credentials.snmp') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="api">{{ t('credentials.api') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="ssh">{{ t('credentials.ssh') }}</UiSortTh>
             <th>{{ t('credentials.secretsSet') }}</th>
             <th class="w-20"><span class="sr-only">{{ t('common.actions') }}</span></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in profiles" :key="p.id">
+          <tr v-for="p in sorted" :key="p.id">
             <td class="font-medium text-gray-900 dark:text-white">{{ p.name }}</td>
             <td><span class="badge badge-gray">{{ p.snmp_version }}</span></td>
             <td>{{ p.api_username || '—' }}</td>

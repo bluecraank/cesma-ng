@@ -26,7 +26,6 @@ from app.models import (
     PortEvent,
     PortEventKind,
     PortMacSighting,
-    PortVlan,
 )
 from app.services.uplinks import uplink_port_ids
 
@@ -111,7 +110,13 @@ async def _apply_ports(
         port.pvid = data.pvid
         port.poe = data.poe
         if {(v.vid, v.tagged) for v in port.vlans} != wanted:
-            port.vlans = [PortVlan(vid=vid, tagged=tagged) for vid, tagged in sorted(wanted)]
+            # untagged wins if a switch reports a VLAN both ways
+            port.set_vlans(
+                {
+                    **{v: True for v in data.tagged_vlans},
+                    **{v: False for v in data.untagged_vlans},
+                }
+            )
 
     for if_index, port in existing.items():
         if if_index not in seen:

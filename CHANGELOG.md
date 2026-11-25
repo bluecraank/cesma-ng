@@ -8,6 +8,32 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-25
+
+### Hinzugefügt
+
+- Tabellen lassen sich per Klick auf die Spaltenüberschrift sortieren: Ports, VLANs, MAC-Adressen und Nachbarn eines Switches, VLANs und Portprofile des Standorts, Backups sowie Benutzer, Zugangsprofile, SSH-Schlüssel, MAC-Typen und Gateways. Leere Werte stehen immer unten
+- VLAN-Tabellen haben ein Suchfeld. Eine Zahlenliste zeigt genau diese VLANs, z. B. `10, 20-29` – das gilt auch für die VLAN-Liste beim Bearbeiten eines Ports
+- VLANs des Standorts: Filter „Nicht auf allen Switches“, „Mit Namensabweichung“, „Client-VLAN“ und „Scan“; die Suche gilt auch für die Portprofile
+- Die Nachbarn (LLDP) eines Switches lassen sich durchsuchen
+- Switch-Liste: neue Spalte „Gebäude / Raum“
+- CSV-Export für die Switch-Liste, die Clients, die VLANs und Portprofile des Standorts sowie Ports, VLANs, MAC-Adressen und Nachbarn eines Switches. Exportiert werden die gerade gefilterten und sortierten Zeilen mit allen Spalten, bei den Clients alle Treffer der Suche und nicht nur die angezeigte Seite. Die Datei lässt sich direkt in Excel öffnen
+- Spalten ein- und ausblenden in der Switch-Liste und der Port-Tabelle; die Auswahl merkt sich der Browser
+- Ports dauerhaft an ein Port-Profil binden: Beim Anwenden eines Profils lässt sich „Dauerhaft an dieses Profil binden“ wählen. Gebundene Ports sind in der Port-Tabelle mit einem Ketten-Symbol markiert, ihre VLANs und Beschreibung lassen sich nicht mehr einzeln ändern (Ein-/Ausschalten bleibt möglich). Ändert man VLANs oder Beschreibung des Profils, überträgt ein Auftrag die Änderung automatisch auf alle gebundenen Ports aller Switches des Standorts. Die Profilliste zeigt die Zahl der gebundenen Ports und kann ein Profil erneut übertragen, z. B. nachdem ein Switch offline war. „Bindung lösen“ und das Löschen des Profils geben die Ports frei, ohne die Konfiguration auf dem Switch zu ändern. „VLANs auch auf Uplinks taggen“ lässt gebundene Ports aus
+- Login-Test pro Switch: Cesma meldet sich stündlich so an, wie es auch Änderungen ausführt (SSH oder API), und gleich wieder ab. Scheitert das, zeigen Switch-Liste und Switch-Seite den Hinweis „Anmeldung am Switch fehlgeschlagen“ mit der Meldung des Switches. Fehlversuche werden mit wachsendem Abstand wiederholt, damit Konten auf dem Switch nicht gesperrt werden. „Aktualisieren“ testet sofort; das Intervall stellt `CESMA_POLL_LOGIN_INTERVAL` ein
+- Der Port-Dialog zeigt Fehler direkt in der Maske an
+
+### Geändert
+
+- Das Übertragen der SSH-Schlüssel auf die Switches ist vorerst abgeschaltet; die Knöpfe sind ausgeblendet. Einschalten mit `CESMA_SSH_KEY_PUSH_ENABLED=true`
+
+### Behoben
+
+- Port-Änderungen meldeten manchmal „HTTP 500“, obwohl der Switch sie übernommen hatte (oft beim Aruba CX). Fragte der Poller den Switch ab, während Cesma noch speicherte, trug er die neuen VLANs zuerst ein, und Cesma scheiterte dann an doppelten Einträgen. Die Änderung gilt jetzt als erfolgreich und steht im Protokoll
+- Eine fehlgeschlagene SSH-Anmeldung (falsches Passwort) erschien als „HTTP 500“; jetzt kommt die Meldung des Switches, und die fehlgeschlagene Änderung steht im Protokoll
+- Unerwartete Fehler zeigen statt „HTTP 500“ die Ursache
+- Meldungen erschienen hinter geöffneten Dialogen; sie stehen jetzt im obersten Dialog
+
 ## [0.16.0] - 2026-11-24
 
 ### Hinzugefügt

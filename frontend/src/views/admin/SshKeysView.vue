@@ -2,6 +2,8 @@
 import { ArrowUpTrayIcon, PlusIcon, TrashIcon } from '@heroicons/vue/20/solid'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import UiSortTh from '@/components/ui/UiSortTh.vue'
+import { useTableSort } from '@/composables/useTableSort'
 import { api, type Job, type SshKey } from '@/api/client'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import { useConfirm, useConfirmDelete } from '@/composables/useConfirm'
@@ -24,7 +26,7 @@ const open = ref(false)
 const form = ref({ description: '', key: '' })
 
 /** Own keys first, then by owner and description. */
-const sorted = computed(() =>
+const ownFirst = computed(() =>
   [...keys.value].sort(
     (a, b) =>
       Number(b.user_id === auth.user?.id) - Number(a.user_id === auth.user?.id) ||
@@ -32,6 +34,12 @@ const sorted = computed(() =>
       a.description.localeCompare(b.description),
   ),
 )
+const { sort, sorted } = useTableSort(() => ownFirst.value, {
+  description: (k) => k.description,
+  owner: (k) => k.owner,
+  fingerprint: (k) => k.fingerprint,
+  created: (k) => k.created_at,
+})
 
 function canDelete(key: SshKey): boolean {
   return auth.isSuperadmin || key.user_id === auth.user?.id
@@ -83,7 +91,7 @@ onMounted(load)
         <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">{{ t('sshKeys.hint') }}</p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        <button v-if="auth.can('ssh_keys.push', sites.currentId)" type="button" class="btn btn-secondary" @click="push">
+        <button v-if="auth.features.ssh_key_push && auth.can('ssh_keys.push', sites.currentId)" type="button" class="btn btn-secondary" @click="push">
           <ArrowUpTrayIcon class="size-4" /> {{ t('sshKeys.push') }}
         </button>
         <button type="button" class="btn btn-primary" @click="open = true"><PlusIcon class="size-5" /> {{ t('sshKeys.new') }}</button>
@@ -94,10 +102,10 @@ onMounted(load)
       <table class="table">
         <thead>
           <tr>
-            <th>{{ t('ports.description') }}</th>
-            <th>{{ t('sshKeys.owner') }}</th>
-            <th>{{ t('sshKeys.fingerprint') }}</th>
-            <th>{{ t('audit.time') }}</th>
+            <UiSortTh :sort="sort" column="description">{{ t('ports.description') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="owner">{{ t('sshKeys.owner') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="fingerprint">{{ t('sshKeys.fingerprint') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="created">{{ t('audit.time') }}</UiSortTh>
             <th class="w-10" />
           </tr>
         </thead>

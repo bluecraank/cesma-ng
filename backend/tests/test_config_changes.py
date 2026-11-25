@@ -197,7 +197,17 @@ async def test_backup_job_download_and_diff(
 # --- SSH keys --------------------------------------------------------------------------------
 
 
-async def test_ssh_keys_need_two_and_valid_format(alice: AsyncClient) -> None:
+async def test_ssh_key_upload_is_switched_off_by_default(alice: AsyncClient) -> None:
+    site = (await alice.post("/sites", json={"name": "HQ"})).json()["id"]
+    r = await alice.post("/jobs", json={"kind": "ssh_keys", "site_id": site})
+    assert r.status_code == 422 and "switched off" in r.text
+    assert (await alice.get("/features")).json() == {"ssh_key_push": False}
+
+
+async def test_ssh_keys_need_two_and_valid_format(
+    alice: AsyncClient, app, settings: Settings
+) -> None:  # type: ignore[no-untyped-def]
+    app.state.settings = settings.model_copy(update={"ssh_key_push_enabled": True})
     site = (await alice.post("/sites", json={"name": "HQ"})).json()["id"]
     assert (
         await alice.post("/ssh-keys", json={"description": "x", "key": "not a key at all, really"})
@@ -256,3 +266,185 @@ async def test_rename_sets_hostname_on_switch_and_in_cesma(
     assert result["log"][0].startswith("[simulated]")
     device = (await alice.get(f"/devices/{device_id}")).json()
     assert (device["name"], device["sys_name"]) == ("sw-og-07", "sw-og-07")
+
+
+# --- Port profiles bound to ports ------------------------------------------------------------
+
+
+async def _run_jobs(app, settings: Settings) -> None:  # type: ignore[no-untyped-def]
+    async with app.state.database.sessionmaker() as db:
+        while (pending := await jobs.next_pending(db)) is not None:
+            await jobs.run_job(db, pending, Runtime(settings, app.state.secret_box))
+
+
+async def test_bound_ports_follow_their_profile(
+    alice: AsyncClient, app, settings: Settings
+) -> None:  # type: ignore[no-untyped-def]
+    settings = await _simulated_app(app, settings)
+    device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
+    site_id = (await alice.get(f"/devices/{device_id}")).json()["site_id"]
+    p5, p6 = await _port(alice, device_id, "5"), await _port(alice, device_id, "6")
+    profile = (
+        await alice.post(
+            f"/sites/{site_id}/port-profiles",
+            json={"name": "Office", "untagged_vid": 515, "tagged_vids": [520]},
+        )
+    ).json()
+    assert profile["bound_ports"] == 0 and profile["job_id"] is None
+
+    # apply and bind
+    r = await alice.post(
+        f"/devices/{device_id}/ports/apply",
+        json={"port_ids": [p5["id"], p6["id"]], "profile_id": profile["id"], "bind": True},
+    )
+    assert r.status_code == 200, r.text
+    port = await _port(alice, device_id, "5")
+    assert port["port_profile_id"] == profile["id"]
+    assert port["untagged_vlans"] == [515] and port["tagged_vlans"] == [520]
+    listed = (await alice.get(f"/sites/{site_id}/port-profiles")).json()
+    assert listed[0]["bound_ports"] == 2
+
+    # 1. a bound port cannot be changed on its own ...
+    r = await alice.post(
+        f"/devices/{device_id}/ports/plan", json={"port_ids": [p5["id"]], "tagged": [530]}
+    )
+    assert r.status_code == 422 and "Office" in r.text
+    # ... switching it off is still possible (not part of a profile)
+    r = await alice.post(
+        f"/devices/{device_id}/ports/plan", json={"port_ids": [p5["id"]], "enabled": False}
+    )
+    assert r.status_code == 200, r.text
+
+    # 2. changing the profile rolls the change out to every bound port
+    saved = (
+        await alice.put(
+            f"/sites/{site_id}/port-profiles/{profile['id']}",
+            json={"name": "Office", "untagged_vid": 515, "tagged_vids": [520, 530]},
+        )
+    ).json()
+    assert saved["job_id"] is not None and saved["bound_ports"] == 2
+    await _run_jobs(app, settings)
+    job = (await alice.get(f"/jobs/{saved['job_id']}")).json()
+    assert job["status"] == "done", job
+    for name in ("5", "6"):
+        assert (await _port(alice, device_id, name))["tagged_vlans"] == [520, 530]
+
+    # renaming only does not touch the switches
+    renamed = (
+        await alice.put(
+            f"/sites/{site_id}/port-profiles/{profile['id']}",
+            json={"name": "Büro", "untagged_vid": 515, "tagged_vids": [520, 530]},
+        )
+    ).json()
+    assert renamed["job_id"] is None
+
+    # unbinding releases the port, the configuration stays
+    r = await alice.post(f"/devices/{device_id}/ports/unbind", json={"port_ids": [p5["id"]]})
+    assert r.json() == {"released": 1}
+    port = await _port(alice, device_id, "5")
+    assert port["port_profile_id"] is None and port["tagged_vlans"] == [520, 530]
+    r = await alice.post(
+        f"/devices/{device_id}/ports/plan", json={"port_ids": [p5["id"]], "tagged": [530]}
+    )
+    assert r.status_code == 200
+
+    # deleting the profile releases the remaining ports
+    await alice.delete(f"/sites/{site_id}/port-profiles/{profile['id']}")
+    assert (await _port(alice, device_id, "6"))["port_profile_id"] is None
+
+
+async def test_binding_needs_a_profile(alice: AsyncClient, app, settings: Settings) -> None:  # type: ignore[no-untyped-def]
+    settings = await _simulated_app(app, settings)
+    device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
+    p5 = await _port(alice, device_id, "5")
+    r = await alice.post(
+        f"/devices/{device_id}/ports/plan", json={"port_ids": [p5["id"]], "bind": True}
+    )
+    assert r.status_code == 422
+
+
+async def test_poll_during_apply_does_not_fail_the_change(
+    alice: AsyncClient, app, settings: Settings, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    """The worker may poll the switch while the change is written (AOS-CX saves slowly).
+
+    It then stores the new VLANs first; the change must still succeed and be audited.
+    """
+    from app.drivers.writers import SimulatedWriter
+    from app.models import PortVlan
+
+    settings = await _simulated_app(app, settings)
+    device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
+    port = await _port(alice, device_id, "5")
+    original = SimulatedWriter.apply
+
+    async def apply_while_polled(self, operations):  # type: ignore[no-untyped-def]
+        # what the poller writes: the switch already reports VLAN 520 tagged on port 5
+        async with app.state.database.sessionmaker() as worker_db:
+            worker_db.add(PortVlan(port_id=port["id"], vid=520, tagged=True))
+            await worker_db.commit()
+        return await original(self, operations)
+
+    monkeypatch.setattr(SimulatedWriter, "apply", apply_while_polled)
+    r = await alice.post(
+        f"/devices/{device_id}/ports/apply",
+        json={"port_ids": [port["id"]], "add_tagged": [520]},
+    )
+    assert r.status_code == 200, r.text
+    assert 520 in (await _port(alice, device_id, "5"))["tagged_vlans"]
+    entry = (await alice.get("/audit", params={"action": "port.update"})).json()["items"][0]
+    assert entry["new_values"]["5"]["tagged"] == [120, 520]
+
+
+async def test_unexpected_switch_failure_is_reported_and_audited(
+    alice: AsyncClient, app, settings: Settings, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    from app.drivers.writers import SimulatedWriter
+
+    settings = await _simulated_app(app, settings)
+    device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
+    port = await _port(alice, device_id, "5")
+
+    async def broken(self, operations):  # type: ignore[no-untyped-def]
+        raise RuntimeError("Authentication failed")
+
+    monkeypatch.setattr(SimulatedWriter, "apply", broken)
+    r = await alice.post(
+        f"/devices/{device_id}/ports/apply", json={"port_ids": [port["id"]], "description": "x"}
+    )
+    assert r.status_code == 502
+    assert "Authentication failed" in r.json()["detail"]
+    entry = (await alice.get("/audit", params={"action": "port.update_failed"})).json()["items"]
+    assert "Authentication failed" in entry[0]["message"]
+
+
+async def test_failed_login_test_shows_a_hint(
+    alice: AsyncClient, app, settings: Settings, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    """The worker tests the login like the SNMP poll; a wrong password becomes a hint."""
+    from app.drivers.writers import SimulatedWriter, WriteError
+
+    settings = await _simulated_app(app, settings)
+    device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
+    site_id = (await alice.get(f"/devices/{device_id}")).json()["site_id"]
+    hints = (await alice.get(f"/sites/{site_id}/device-hints")).json()
+    assert not any(h["code"] == "login_failed" for h in hints)  # the simulated login worked
+
+    async def denied(self):  # type: ignore[no-untyped-def]
+        raise WriteError("API login as admin failed: HTTP 401 Authentication failed")
+
+    monkeypatch.setattr(SimulatedWriter, "test_login", denied)
+    async with app.state.database.sessionmaker() as db:
+        assert not await poll_device(
+            db,
+            device_id,
+            PollTask.LOGIN,
+            settings=settings,
+            box=app.state.secret_box,
+            driver_factory=driver_factory_for(settings),
+        )
+    hints = (await alice.get(f"/sites/{site_id}/device-hints")).json()
+    [hint] = [h for h in hints if h["code"] == "login_failed"]
+    assert "Authentication failed" in hint["detail"] and hint["device_id"] == device_id
+    # the switch answers SNMP: a failed login does not make it offline
+    assert (await alice.get(f"/devices/{device_id}")).json()["status"] == "online"

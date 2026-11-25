@@ -2,6 +2,8 @@
 import { PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/vue/20/solid'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import UiSortTh from '@/components/ui/UiSortTh.vue'
+import { useTableSort } from '@/composables/useTableSort'
 import { api, type MacType } from '@/api/client'
 import MacTypeIcon from '@/components/MacTypeIcon.vue'
 import UiDialog from '@/components/ui/UiDialog.vue'
@@ -14,6 +16,7 @@ const notify = useNotify()
 const confirmDelete = useConfirmDelete()
 
 const types = ref<MacType[]>([])
+const { sort, sorted } = useTableSort(() => types.value, { prefix: (m) => m.prefix, name: (m) => m.name, icon: (m) => m.icon })
 const open = ref(false)
 const editingId = ref<number | null>(null)
 const form = ref({ prefix: '', name: '', icon: 'device' })
@@ -61,14 +64,14 @@ onMounted(load)
       <table class="table">
         <thead>
           <tr>
-            <th>{{ t('macTypes.prefix') }}</th>
-            <th>{{ t('common.name') }}</th>
-            <th>{{ t('macTypes.icon') }}</th>
+            <UiSortTh :sort="sort" column="prefix">{{ t('macTypes.prefix') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="name">{{ t('common.name') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="icon">{{ t('macTypes.icon') }}</UiSortTh>
             <th class="w-20"><span class="sr-only">{{ t('common.actions') }}</span></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="mt in types" :key="mt.id">
+          <tr v-for="mt in sorted" :key="mt.id">
             <td class="font-mono">{{ mt.prefix }}</td>
             <td class="font-medium text-gray-900 dark:text-white">{{ mt.name }}</td>
             <td><MacTypeIcon :icon="mt.icon" /></td>

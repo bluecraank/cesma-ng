@@ -7,8 +7,14 @@ export const useAuthStore = defineStore('auth', () => {
   const loaded = ref(false)
 
   const isSuperadmin = computed(() => user.value?.is_superadmin ?? false)
+  /** Functions switched on in the server configuration (off until known). */
+  const features = ref<{ ssh_key_push: boolean }>({ ssh_key_push: false })
 
   async function load(): Promise<void> {
+    api
+      .get<{ ssh_key_push: boolean }>('/features')
+      .then((f) => (features.value = f))
+      .catch(() => undefined)
     try {
       user.value = await api.get<User>('/auth/me')
     } catch {
@@ -50,5 +56,5 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value?.site_roles.find((r) => r.site_id === siteId)?.role_name ?? null
   }
 
-  return { user, loaded, isSuperadmin, load, login, logout, hasSite, can, canAnywhere, roleName }
+  return { user, loaded, isSuperadmin, features, load, login, logout, hasSite, can, canAnywhere, roleName }
 })

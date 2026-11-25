@@ -9,7 +9,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import utcnow
-from app.core.errors import ForbiddenError, NotFoundError, ValidationFailedError
+from app.core.errors import DeviceError, ForbiddenError, NotFoundError, ValidationFailedError
 from app.drivers.writers import WriteError
 from app.models import (
     AuditLevel,
@@ -19,9 +19,19 @@ from app.models import (
     Job,
     JobStatus,
     Permission,
+    Port,
+    PortProfile,
     User,
 )
-from app.services import audit, backups, discovery, polling, site_config, ssh_keys
+from app.services import (
+    audit,
+    backups,
+    discovery,
+    polling,
+    port_config,
+    site_config,
+    ssh_keys,
+)
 from app.services.access import require_permission, require_site_access, visible_site_ids
 from app.services.context import Caller, Runtime
 from app.services.credentials import public_key_of
@@ -39,6 +49,8 @@ JOB_KINDS: dict[str, Permission] = {
     "ssh_keys": Permission.SSH_KEYS_PUSH,
     "discover": Permission.DEVICES_MANAGE,
     "restore": Permission.BACKUPS_RESTORE,
+    # whoever may change a port profile rolls it out to the ports bound to it
+    "port_profile": Permission.VLANS_MANAGE,
 }
 
 
@@ -135,6 +147,8 @@ async def run_job(db: AsyncSession, job: Job, runtime: Runtime) -> None:
         if user is None or not user.is_active:
             raise ForbiddenError("The user who started the job no longer exists or is disabled")
         caller = Caller(user)
+        if job.kind == "ssh_keys" and not runtime.settings.ssh_key_push_enabled:
+            raise ValidationFailedError("Uploading SSH keys is switched off")
         if job.site_id is not None:
             # permissions may have changed since the job was queued
             require_permission(user, job.site_id, JOB_KINDS[job.kind])
@@ -291,10 +305,53 @@ async def _run_restore(ctx: JobContext) -> None:
     await ctx.say(f"{device.name}: restored", 100)
 
 
+async def _run_port_profile(ctx: JobContext) -> None:
+    """Apply a port profile to every port bound to it, switch by switch."""
+    profile_id = int(ctx.job.payload.get("profile_id") or 0)
+    profile = await ctx.db.get(PortProfile, profile_id)
+    if profile is None or profile.site_id != ctx.job.site_id:
+        await ctx.say("Port profile no longer exists, nothing to do", 100)
+        return
+    change = port_config.profile_change(profile)
+    rows = await ctx.db.execute(
+        select(Port.device_id, Port.id)
+        .join(Device, Device.id == Port.device_id)
+        .where(Port.port_profile_id == profile.id, Device.status != DeviceStatus.UNCONFIRMED)
+    )
+    by_device: dict[int, list[int]] = {}
+    for device_id, port_id in rows:
+        by_device.setdefault(device_id, []).append(port_id)
+    await ctx.say(f"Port profile {profile.name}: {sum(map(len, by_device.values()))} port(s)")
+    failed = 0
+    for index, (device_id, port_ids) in enumerate(sorted(by_device.items()), 1):
+        progress = int(index / len(by_device) * 100)
+        device = await ctx.db.get(Device, device_id)
+        assert device is not None
+        name = device.name
+        try:
+            plan, _ = await port_config.apply_port_change(
+                ctx.db,
+                ctx.caller,
+                ctx.runtime,
+                device_id,
+                port_ids,
+                change,
+                Permission.VLANS_MANAGE,
+            )
+            done = "nothing to do" if plan.empty else f"{len(plan.operations)} change(s) applied"
+            await ctx.say(f"{name}: {done}", progress)
+        except DeviceError as exc:
+            failed += 1
+            await ctx.say(f"{name}: FAILED - {exc}", progress)
+    if failed:
+        raise WriteError(f"{failed} of {len(by_device)} switch(es) failed, see log")
+
+
 RUNNERS: dict[str, Callable[[JobContext], Awaitable[None]]] = {
     "vlan_sync": _run_vlan_sync,
     "backup": _run_backup,
     "ssh_keys": _run_ssh_keys,
     "discover": _run_discover,
     "restore": _run_restore,
+    "port_profile": _run_port_profile,
 }

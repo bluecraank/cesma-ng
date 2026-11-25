@@ -28,11 +28,31 @@ class Port(Base):
     poe: Mapped[PoeStatus | None] = mapped_column(str_enum(PoeStatus, 16))
     #: last time the link went up or down (as seen by the poller)
     last_change_at: Mapped[datetime | None]
+    #: port profile the port is bound to: only the profile changes it, on every profile change
+    port_profile_id: Mapped[int | None] = mapped_column(
+        ForeignKey("port_profiles.id", ondelete="SET NULL"), index=True
+    )
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
 
     vlans: Mapped[list["PortVlan"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin", order_by="PortVlan.vid"
     )
+
+    def set_vlans(self, wanted: dict[int, bool]) -> None:
+        """Set the VLANs (vid -> tagged), touching only the rows that differ.
+
+        Replacing the whole list would delete and re-insert unchanged rows; when the API and the
+        poller store the same new state at the same time that ends in duplicate keys.
+        """
+        current = {v.vid: v for v in self.vlans}
+        for vid, row in current.items():
+            if vid not in wanted:
+                self.vlans.remove(row)
+            elif row.tagged != wanted[vid]:
+                row.tagged = wanted[vid]
+        for vid, tagged in sorted(wanted.items()):
+            if vid not in current:
+                self.vlans.append(PortVlan(vid=vid, tagged=tagged))
 
 
 class PortVlan(Base):
@@ -133,6 +153,8 @@ class PollTask(StrEnum):
     ARP = "arp"
     LLDP = "lldp"
     COUNTERS = "counters"  # traffic and error counters (port statistics)
+    #: log in as changes do (SSH or API) and out again: finds wrong passwords early
+    LOGIN = "login"
 
 
 class DevicePollState(Base):

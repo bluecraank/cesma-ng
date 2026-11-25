@@ -2,6 +2,8 @@
 import { PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/vue/20/solid'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import UiSortTh from '@/components/ui/UiSortTh.vue'
+import { useTableSort } from '@/composables/useTableSort'
 import { api, type CredentialProfile, type Gateway } from '@/api/client'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import UiToggle from '@/components/ui/UiToggle.vue'
@@ -14,6 +16,13 @@ const notify = useNotify()
 const confirmDelete = useConfirmDelete()
 
 const gateways = ref<Gateway[]>([])
+const { sort, sorted } = useTableSort(() => gateways.value, {
+  name: (g) => g.name,
+  hostname: (g) => g.hostname,
+  enabled: (g) => g.enabled,
+  entries: (g) => g.entries,
+  lastPolled: (g) => g.last_polled_at,
+})
 const profiles = ref<CredentialProfile[]>([])
 const open = ref(false)
 const editingId = ref<number | null>(null)
@@ -70,16 +79,16 @@ onMounted(load)
       <table class="table">
         <thead>
           <tr>
-            <th>{{ t('common.name') }}</th>
-            <th>{{ t('device.hostname') }}</th>
-            <th>{{ t('gateways.enabled') }}</th>
-            <th class="text-right">{{ t('gateways.entries') }}</th>
-            <th>{{ t('gateways.lastPolled') }}</th>
+            <UiSortTh :sort="sort" column="name">{{ t('common.name') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="hostname">{{ t('device.hostname') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="enabled">{{ t('gateways.enabled') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="entries" class="!text-right">{{ t('gateways.entries') }}</UiSortTh>
+            <UiSortTh :sort="sort" column="lastPolled">{{ t('gateways.lastPolled') }}</UiSortTh>
             <th class="w-20"><span class="sr-only">{{ t('common.actions') }}</span></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="g in gateways" :key="g.id">
+          <tr v-for="g in sorted" :key="g.id">
             <td class="font-medium text-gray-900 dark:text-white">{{ g.name }}</td>
             <td class="font-mono text-xs">{{ g.hostname }}</td>
             <td><span class="badge" :class="g.enabled ? 'badge-green' : 'badge-gray'">{{ g.enabled ? t('common.yes') : t('common.no') }}</span></td>
