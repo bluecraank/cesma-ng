@@ -78,6 +78,13 @@
   select.input {
     @apply pr-8;
   }
+  /* small field, e.g. the filter row of a table */
+  .input-xs {
+    @apply min-w-20 px-2 py-1 text-xs font-normal;
+  }
+  select.input-xs {
+    @apply pr-7;
+  }
 
   .label {
     @apply block text-sm font-medium text-gray-900 dark:text-white;
@@ -128,6 +135,10 @@
   }
   .table th {
     @apply px-3 py-2.5 text-left text-xs font-medium whitespace-nowrap text-gray-500 dark:text-gray-400;
+  }
+  /* The filter row scrolls away below the sticky header row instead of covering it. */
+  .table thead tr.col-filters th {
+    @apply static py-1.5;
   }
   .table td {
     @apply px-3 py-2 align-middle text-gray-700 tabular-nums dark:text-gray-300;

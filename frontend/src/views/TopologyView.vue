@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
- * LLDP topology as a star: the core switch in the centre, the switches behind it in rings.
+ * LLDP topology as layers: the core switch at the top, every further hop one layer lower, the
+ * order chosen so that as few lines as possible cross (see treeLayout).
  * The layout is computed (not simulated), so it is fast and looks the same after every reload.
  */
 import { ArrowsPointingOutIcon } from '@heroicons/vue/20/solid'
@@ -13,7 +14,7 @@ import type { components } from '@/api/schema'
 import { useNotify } from '@/composables/useNotify'
 import { useTheme } from '@/composables/useTheme'
 import { useSitesStore } from '@/stores/sites'
-import { starLayout } from '@/utils/starLayout'
+import { treeLayout, type Point } from '@/utils/treeLayout'
 
 type Topology = components['schemas']['TopologyOut']
 
@@ -87,6 +88,24 @@ function mergedEdges(topology: Topology): ElementDefinition[] {
   }))
 }
 
+/**
+ * Cytoscape describes bend points relative to the line between the two nodes: how far along
+ * it (0 = source, 1 = target) and how far to the side.
+ */
+function segmentStyle(from: Point, to: Point, points: Point[]): Record<string, unknown> {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const length2 = dx * dx + dy * dy || 1
+  const length = Math.sqrt(length2)
+  return {
+    'curve-style': 'round-segments', // slightly rounded bends
+    'edge-distances': 'node-position',
+    'segment-weights': points.map((p) => ((p.x - from.x) * dx + (p.y - from.y) * dy) / length2),
+    'segment-distances': points.map((p) => ((p.x - from.x) * -dy + (p.y - from.y) * dx) / length),
+    'segment-radii': 40,
+  }
+}
+
 function style(): cytoscape.StylesheetJson {
   const dark = theme.value === 'dark'
   const text = dark ? '#e5e7eb' : '#111827'
@@ -148,11 +167,18 @@ function render(): void {
   if (!data.value || !container.value) return
   const topology = data.value
   const edges = mergedEdges(topology)
-  const { positions, roots } = starLayout(
+  const { positions, bends, roots } = treeLayout(
     topology.nodes.map((n) => n.id),
     edges.map((e) => [e.data.source as string, e.data.target as string]),
     { root: center.value || null, leaves: topology.nodes.filter((n) => n.kind !== 'switch').map((n) => n.id) },
   )
+  // links over several layers run through their bend points
+  for (const edge of edges) {
+    const points = bends.get(edge.data.id as string)
+    const from = positions.get(edge.data.source as string)
+    const to = positions.get(edge.data.target as string)
+    if (points?.length && from && to) edge.style = segmentStyle(from, to, points)
+  }
   const elements: ElementDefinition[] = [
     ...topology.nodes.map((n) => ({
       data: { id: n.id, label: n.label, deviceId: n.device_id, kind: n.kind, color: STATUS_COLORS[n.status] ?? '#9ca3af' },

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { BoltIcon, LinkIcon, ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PauseCircleIcon, PencilSquareIcon, PlayCircleIcon, XMarkIcon } from '@heroicons/vue/20/solid'
-import { computed, nextTick, ref, watch } from 'vue'
+import { BoltIcon, FunnelIcon, LinkIcon, ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PauseCircleIcon, PencilSquareIcon, PlayCircleIcon, XMarkIcon } from '@heroicons/vue/20/solid'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api, type DeviceVlan, type FdbEntry, type Port } from '@/api/client'
 import PortEditDialog from './PortEditDialog.vue'
@@ -13,6 +13,7 @@ import { useNotify } from '@/composables/useNotify'
 import { useTableSort } from '@/composables/useTableSort'
 import TrafficChart from './TrafficChart.vue'
 import type { components } from '@/api/schema'
+import { textColumnMatcher, vlanColumnMatcher } from '@/utils/columnFilter'
 import { csvDate, downloadCsv } from '@/utils/csv'
 import { formatDateTime } from '@/utils/format'
 import { shortVendor } from '@/utils/vendor'
@@ -130,12 +131,48 @@ async function setEnabled(on: boolean): Promise<void> {
   if (done) onApplied()
 }
 
+// --- Filter per column (in the URL, e.g. ?f_untagged=555) ---
+const colFilter = reactive({
+  name: useQueryParam('f_port'),
+  status: useQueryParam('f_status'), // "" | up | down | disabled
+  description: useQueryParam('f_desc'),
+  untagged: useQueryParam('f_untagged'),
+  tagged: useQueryParam('f_tagged'),
+  poe: useQueryParam('f_poe'), // "" | none | a PoE state
+  neighbor: useQueryParam('f_neighbor'),
+})
+const activeColFilters = computed(() => Object.values(colFilter).filter((v) => v.trim()).length)
+const showColFilters = ref(activeColFilters.value > 0)
+function clearColFilters(): void {
+  for (const key of Object.keys(colFilter) as (keyof typeof colFilter)[]) colFilter[key] = ''
+}
+const vlanName = (vid: number): string | undefined => props.vlans.find((v) => v.vid === vid)?.name
+const portState = (p: Port): string => (!p.admin_up ? 'disabled' : p.oper_up ? 'up' : 'down')
+
+const columnMatches = computed(() => {
+  const name = textColumnMatcher(colFilter.name)
+  const description = textColumnMatcher(colFilter.description)
+  const neighbor = textColumnMatcher(colFilter.neighbor)
+  const untagged = vlanColumnMatcher(colFilter.untagged, vlanName)
+  const tagged = vlanColumnMatcher(colFilter.tagged, vlanName)
+  return (p: Port): boolean =>
+    name(p.name) &&
+    (!colFilter.status || portState(p) === colFilter.status) &&
+    description(p.description) &&
+    untagged(p.untagged_vlans) &&
+    tagged(p.tagged_vlans) &&
+    (!colFilter.poe || (colFilter.poe === 'none' ? !p.poe : p.poe === colFilter.poe)) &&
+    neighbor(p.neighbor)
+})
+
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
+  const columns = columnMatches.value
   return props.ports.filter(
     (p) =>
       (!onlyUp.value || p.oper_up) &&
       (!onlyUplinks.value || p.is_uplink) &&
+      columns(p) &&
       (!q ||
         [p.name, p.description, p.neighbor ?? '', ...p.untagged_vlans.map(String), ...p.tagged_vlans.map(String)].some((v) =>
           v.toLowerCase().includes(q),
@@ -237,6 +274,18 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
       <label class="flex items-center gap-2 text-sm"><input v-model="onlyUp" type="checkbox" class="rounded accent-brand-600" /> {{ t('ports.onlyUp') }}</label>
       <label class="flex items-center gap-2 text-sm"><input v-model="onlyUplinks" type="checkbox" class="rounded accent-brand-600" /> {{ t('ports.onlyUplinks') }}</label>
       <span class="ml-auto text-sm text-gray-500 dark:text-gray-400">{{ rows.length }} / {{ ports.length }}</span>
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm"
+        :class="{ '!text-brand-600 dark:!text-brand-400': showColFilters || activeColFilters > 0 }"
+        :aria-pressed="showColFilters"
+        :title="t('ports.columnFilterHint')"
+        @click="showColFilters = !showColFilters"
+      >
+        <FunnelIcon class="size-4" /> {{ t('ports.columnFilter') }}
+        <span v-if="activeColFilters" class="badge badge-brand">{{ activeColFilters }}</span>
+      </button>
+      <button v-if="activeColFilters" type="button" class="link text-sm" @click="clearColFilters">{{ t('ports.clearFilters') }}</button>
       <UiColumnMenu :columns="optionalColumns" :state="cols" />
       <UiCsvButton :disabled="!rows.length" @click="exportCsv" />
     </div>
@@ -285,6 +334,41 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
             <UiSortTh v-if="cols.shows('macs')" :sort="sort" column="macs" class="!text-right">{{ t('ports.macs') }}</UiSortTh>
             <UiSortTh v-if="cols.shows('lastChange')" :sort="sort" column="lastChange">{{ t('ports.lastChange') }}</UiSortTh>
             <th v-if="canEdit" class="w-8" />
+          </tr>
+          <tr v-if="showColFilters" class="col-filters">
+            <th v-if="canEdit" />
+            <th />
+            <th><input v-model="colFilter.name" class="input input-xs" :placeholder="t('ports.filterText')" :aria-label="t('ports.port')" /></th>
+            <th>
+              <select v-model="colFilter.status" class="input input-xs" :aria-label="t('ports.status')">
+                <option value="">{{ t('ports.filterAll') }}</option>
+                <option value="up">{{ t('ports.up') }}</option>
+                <option value="down">{{ t('ports.down') }}</option>
+                <option value="disabled">{{ t('ports.adminDown') }}</option>
+              </select>
+            </th>
+            <th v-if="cols.shows('description')">
+              <input v-model="colFilter.description" class="input input-xs" :placeholder="t('ports.filterText')" :aria-label="t('ports.description')" />
+            </th>
+            <th v-if="cols.shows('untagged')">
+              <input v-model="colFilter.untagged" class="input input-xs" :placeholder="t('ports.filterVlan')" :title="t('ports.filterVlanHint')" :aria-label="t('ports.untagged')" />
+            </th>
+            <th v-if="cols.shows('tagged')">
+              <input v-model="colFilter.tagged" class="input input-xs" :placeholder="t('ports.filterVlan')" :title="t('ports.filterVlanHint')" :aria-label="t('ports.tagged')" />
+            </th>
+            <th v-if="cols.shows('poe')">
+              <select v-model="colFilter.poe" class="input input-xs" :aria-label="t('ports.poe')">
+                <option value="">{{ t('ports.filterAll') }}</option>
+                <option v-for="state in ['delivering', 'searching', 'disabled', 'fault']" :key="state" :value="state">{{ t(`ports.poeStates.${state}`) }}</option>
+                <option value="none">{{ t('ports.noPoe') }}</option>
+              </select>
+            </th>
+            <th v-if="cols.shows('neighbor')">
+              <input v-model="colFilter.neighbor" class="input input-xs" :placeholder="t('ports.filterText')" :aria-label="t('ports.neighbor')" />
+            </th>
+            <th v-if="cols.shows('macs')" />
+            <th v-if="cols.shows('lastChange')" />
+            <th v-if="canEdit" />
           </tr>
         </thead>
         <tbody>

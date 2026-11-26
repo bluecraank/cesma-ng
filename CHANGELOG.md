@@ -8,6 +8,16 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-26
+
+### Hinzugefügt
+
+- Port-Tabelle: Filter pro Spalte. „Spaltenfilter“ blendet unter den Spaltenköpfen eine Filterzeile ein. In den VLAN-Spalten findet `555` genau die Ports mit VLAN 555, `10, 20-29` eines davon, ein Text den VLAN-Namen, `!555` die Ports ohne VLAN 555 und `-` die Ports ohne VLAN in dieser Spalte. Port, Beschreibung und Nachbar filtern nach Text (`!` schließt aus), Status und PoE per Auswahl. Die Filter stehen in der Adresse, „Filter zurücksetzen“ leert alle
+
+### Geändert
+
+- Topologie: Statt als Stern stehen die Switches jetzt in Ebenen – der Core-Switch oben, jede weitere LLDP-Ebene darunter. Die Reihenfolge ist so gewählt, dass sich möglichst wenige Linien kreuzen, auch bei redundanten Verbindungen; Verbindungen über mehrere Ebenen bekommen auf den Ebenen dazwischen einen eigenen Platz mit Knick, statt quer durch andere Switches zu laufen. Ein zweiter Core-Switch steht zwischen dem Core und den Switches, die an beiden hängen. „Oben“ (vorher „Zentrum“) legt fest, welcher Switch ganz oben steht
+
 ## [0.18.0] - 2026-11-26
 
 ### Hinzugefügt
