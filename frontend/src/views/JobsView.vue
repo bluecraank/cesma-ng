@@ -5,11 +5,13 @@ import { useI18n } from 'vue-i18n'
 import { api, type Job } from '@/api/client'
 import { useSitesStore } from '@/stores/sites'
 import UiTime from '@/components/ui/UiTime.vue'
+import { useQueryNumber } from '@/composables/useQueryState'
 
 const { t } = useI18n()
 const sites = useSitesStore()
 const jobs = ref<Job[]>([])
-const expanded = ref<number | null>(null)
+/** the job whose log is open (?job=12, also the target of the task list's links) */
+const expanded = useQueryNumber('job', 0)
 let timer: ReturnType<typeof setTimeout> | undefined
 
 const badge = { pending: 'badge-gray', running: 'badge-blue', done: 'badge-green', failed: 'badge-red' } as const
@@ -42,13 +44,17 @@ onUnmounted(() => clearTimeout(timer))
         </thead>
         <tbody>
           <template v-for="j in jobs" :key="j.id">
-            <tr class="cursor-pointer" @click="expanded = expanded === j.id ? null : j.id">
+            <tr class="cursor-pointer" @click="expanded = expanded === j.id ? 0 : j.id">
               <td class="text-gray-400">
                 <ChevronDownIcon v-if="expanded === j.id" class="size-4" />
                 <ChevronRightIcon v-else class="size-4" />
               </td>
               <td class="whitespace-nowrap tabular-nums"><UiTime :value="j.created_at" /></td>
-              <td class="font-medium">{{ t(`jobs.kinds.${j.kind}`) }} <span class="text-xs text-gray-400">#{{ j.id }}</span></td>
+              <td>
+                <span class="font-medium">{{ t(`jobs.kinds.${j.kind}`) }}</span> <span class="text-xs text-gray-400">#{{ j.id }}</span>
+                <RouterLink v-if="j.summary && j.device_id" :to="`/devices/${j.device_id}`" class="link block text-xs font-normal" @click.stop>{{ j.summary }}</RouterLink>
+                <span v-else-if="j.summary" class="block text-xs text-gray-500">{{ j.summary }}</span>
+              </td>
               <td class="whitespace-nowrap">
                 <span class="badge" :class="badge[j.status as keyof typeof badge]">{{ t(`jobs.statuses.${j.status}`) }}</span>
                 <span v-if="j.status === 'running'" class="ml-2 text-xs tabular-nums">{{ j.progress }} %</span>

@@ -2,10 +2,11 @@
 import { ArrowUturnLeftIcon, ExclamationTriangleIcon, LinkIcon, LinkSlashIcon, MagnifyingGlassIcon, XCircleIcon } from '@heroicons/vue/20/solid'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { api, ApiError, type ApplyResult, type ChangePlan, type DeviceVlan, type Port, type PortProfile } from '@/api/client'
+import { api, ApiError, type ChangePlan, type DeviceVlan, type Job, type Port, type PortProfile } from '@/api/client'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import UiSpinner from '@/components/ui/UiSpinner.vue'
 import { useNotify } from '@/composables/useNotify'
+import { useJobsStore } from '@/stores/jobs'
 import { vlanMatcher } from '@/utils/vlanFilter'
 
 const props = defineProps<{
@@ -21,6 +22,7 @@ const emit = defineEmits<{ applied: [] }>()
 
 const { t } = useI18n()
 const notify = useNotify()
+const jobs = useJobsStore()
 
 type Tri = 'keep' | 'on' | 'off'
 /** Membership of one VLAN; "mixed" only as the start state when several ports differ. */
@@ -236,12 +238,11 @@ async function unbind(): Promise<void> {
   }
 }
 
+/** Queue the change and close: it runs in the background, the task list at the bottom shows it. */
 async function apply(): Promise<void> {
   busy.value = true
   const ok = await attempt(async () => {
-    const result = await api.post<ApplyResult>(`/devices/${props.deviceId}/ports/apply`, body())
-    const simulated = result.log.some((line) => line.startsWith('[simulated]'))
-    notify.success(simulated ? `${t('change.applied')} – ${t('change.simulated')}` : t('change.applied'))
+    jobs.track(await api.post<Job>(`/devices/${props.deviceId}/ports/jobs`, body()))
   })
   busy.value = false
   if (ok) {

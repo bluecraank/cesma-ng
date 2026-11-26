@@ -2,7 +2,7 @@
 import { BoltIcon, FunnelIcon, LinkIcon, ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PauseCircleIcon, PencilSquareIcon, PlayCircleIcon, XMarkIcon } from '@heroicons/vue/20/solid'
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { api, type DeviceVlan, type FdbEntry, type Port } from '@/api/client'
+import { api, type DeviceVlan, type FdbEntry, type Job, type Port } from '@/api/client'
 import PortEditDialog from './PortEditDialog.vue'
 import UiColumnMenu from '@/components/ui/UiColumnMenu.vue'
 import UiCsvButton from '@/components/ui/UiCsvButton.vue'
@@ -19,6 +19,7 @@ import { formatDateTime } from '@/utils/format'
 import { shortVendor } from '@/utils/vendor'
 import UiTime from '@/components/ui/UiTime.vue'
 import { useQueryFlag, useQueryParam } from '@/composables/useQueryState'
+import { useJobsStore } from '@/stores/jobs'
 
 const props = defineProps<{
   deviceId: number
@@ -104,6 +105,7 @@ function onApplied(): void {
 
 const { confirm } = useConfirm()
 const notify = useNotify()
+const jobs = useJobsStore()
 const switching = ref(false)
 
 /** Switch the selected ports on or off right away (after a confirmation), without the dialog. */
@@ -123,10 +125,9 @@ async function setEnabled(on: boolean): Promise<void> {
   })
   if (!ok) return
   switching.value = true
-  const done = await notify.run(
-    () => api.post(`/devices/${props.deviceId}/ports/apply`, { port_ids: ports.map((p) => p.id), enabled: on }),
-    t('change.applied'),
-  )
+  const done = await notify.run(async () => {
+    jobs.track(await api.post<Job>(`/devices/${props.deviceId}/ports/jobs`, { port_ids: ports.map((p) => p.id), enabled: on }))
+  })
   switching.value = false
   if (done) onApplied()
 }

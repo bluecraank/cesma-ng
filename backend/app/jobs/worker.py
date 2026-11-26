@@ -29,6 +29,8 @@ from app.services.polling import (
 log = logging.getLogger("cesma.worker")
 
 START_DELAY = timedelta(seconds=30)
+#: quick jobs (port changes, renames) running at the same time, each on another switch
+QUICK_CONCURRENCY = 4
 
 JobFunc = Callable[[AsyncSession], Awaitable[None]]
 
@@ -79,6 +81,8 @@ class Worker:
         self._running: set[tuple[int, PollTask]] = set()
         self._tasks: set[asyncio.Task[None]] = set()
         self._job_task: asyncio.Task[None] | None = None
+        #: running quick jobs: job id -> switch
+        self._quick: dict[int, int | None] = {}
         self.runtime = Runtime(settings, box)
 
     async def run(self, stop: asyncio.Event) -> None:
@@ -97,6 +101,7 @@ class Worker:
                 await self._schedule_polls()
                 await self._run_due_jobs()
                 await self._start_queued_job()
+                await self._start_quick_jobs()
             except Exception:
                 log.exception("Worker loop error")
             with suppress(TimeoutError):
@@ -140,11 +145,32 @@ class Worker:
         if self._job_task is not None and not self._job_task.done():
             return
         async with self.database.sessionmaker() as db:
-            job = await queued_jobs.next_pending(db)
+            job = await queued_jobs.next_pending(db, quick=False)
         if job is not None:
             self._job_task = asyncio.create_task(self._run_queued(job.id))
             self._tasks.add(self._job_task)
             self._job_task.add_done_callback(self._tasks.discard)
+
+    async def _start_quick_jobs(self) -> None:
+        """Port changes and renames run next to the long jobs, one at a time per switch."""
+        while len(self._quick) < QUICK_CONCURRENCY:
+            busy = {device for device in self._quick.values() if device is not None}
+            async with self.database.sessionmaker() as db:
+                job = await queued_jobs.next_pending(
+                    db, quick=True, busy_devices=busy, exclude_ids=set(self._quick)
+                )
+            if job is None:
+                return
+            job_id = job.id
+            self._quick[job_id] = job.device_id
+            task = asyncio.create_task(self._run_queued(job_id))
+            self._tasks.add(task)
+
+            def finished(done: asyncio.Task[None], job_id: int = job_id) -> None:
+                self._tasks.discard(done)
+                self._quick.pop(job_id, None)
+
+            task.add_done_callback(finished)
 
     async def _run_queued(self, job_id: int) -> None:
         async with self.database.sessionmaker() as db:

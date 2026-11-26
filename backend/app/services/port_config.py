@@ -2,8 +2,9 @@
 
 import asyncio
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -80,6 +81,28 @@ def profile_change(
         clear_untagged=profile.untagged_vid is None,
         profile_id=profile.id,
         bind=bind,
+    )
+
+
+async def build_change(db: AsyncSession, site_id: int, data: Mapping[str, Any]) -> PortChange:
+    """The change asked for (fields of ``PortChangeIn``); a profile overrides VLANs/description."""
+    enabled = data.get("enabled")
+    if (profile_id := data.get("profile_id")) is not None:
+        profile = await db.get(PortProfile, profile_id)
+        if profile is None or profile.site_id != site_id:
+            raise NotFoundError("Port profile not found at this site")
+        return profile_change(profile, enabled=enabled, bind=bool(data.get("bind")))
+    if data.get("bind"):
+        raise ValidationFailedError("Binding needs a port profile")
+    tagged = data.get("tagged")
+    return PortChange(
+        description=data.get("description"),
+        enabled=enabled,
+        untagged=data.get("untagged"),
+        tagged=frozenset(tagged) if tagged is not None else None,
+        clear_untagged=bool(data.get("clear_untagged")),
+        add_tagged=frozenset(data.get("add_tagged") or ()),
+        remove_tagged=frozenset(data.get("remove_tagged") or ()),
     )
 
 

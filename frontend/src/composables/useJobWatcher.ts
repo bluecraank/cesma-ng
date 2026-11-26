@@ -1,37 +1,29 @@
-import { onUnmounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { api, type Job } from '@/api/client'
-import { showToast } from './useToasts'
+import { computed, onUnmounted, ref } from 'vue'
+import type { Job } from '@/api/client'
+import { useJobsStore } from '@/stores/jobs'
 
-/** Follows a queued job until it is done; shows a toast at the end. */
+/**
+ * Follows a queued job until it is done. The task list (jobs store) polls it and shows the
+ * toast at the end; this only exposes the job's progress and calls ``onFinished``.
+ */
 export function useJobWatcher(onFinished?: (job: Job) => void) {
-  const { t } = useI18n()
-  const job = ref<Job | null>(null)
-  let timer: ReturnType<typeof setTimeout> | undefined
+  const store = useJobsStore()
+  const id = ref<number | null>(null)
+  const started = ref<Job | null>(null)
+  const job = computed(() => store.jobs.find((j) => j.id === id.value) ?? started.value)
 
-  async function poll(id: number): Promise<void> {
-    try {
-      job.value = await api.get<Job>(`/jobs/${id}`)
-    } catch {
-      timer = setTimeout(() => poll(id), 3000)
-      return
-    }
-    if (job.value.status === 'done' || job.value.status === 'failed') {
-      const kind = t(`jobs.kinds.${job.value.kind}`)
-      if (job.value.status === 'done') showToast('success', t('jobs.finished', { kind }))
-      else showToast('error', t('jobs.failed', { kind }), job.value.error ?? undefined)
-      onFinished?.(job.value)
-      return
-    }
-    timer = setTimeout(() => poll(id), 1500)
+  const stop = store.onFinished((ended) => {
+    if (ended.id !== id.value) return
+    started.value = ended
+    onFinished?.(ended)
+  })
+  onUnmounted(stop)
+
+  function watch(queued: Job): void {
+    id.value = queued.id
+    started.value = queued
+    store.track(queued)
   }
 
-  function watch(started: Job): void {
-    clearTimeout(timer)
-    job.value = started
-    void poll(started.id)
-  }
-
-  onUnmounted(() => clearTimeout(timer))
   return { job, watch }
 }

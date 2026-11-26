@@ -31,7 +31,7 @@ from app.services import backups, device_rename, jobs, port_config, site_config,
 from app.services.console import run_command
 from app.services.context import Caller
 from app.services.devices import get_device
-from app.services.port_config import PortChange
+from app.services.port_config import PortChange, build_change
 
 router = APIRouter(tags=["configuration"], dependencies=[Depends(csrf_guard)])
 
@@ -47,23 +47,8 @@ def _plan_out(plan: ChangePlan) -> dict[str, Any]:
 
 
 async def _port_change(db: Db, caller: Caller, device_id: int, body: PortChangeIn) -> PortChange:
-    if body.profile_id is not None:
-        device = await get_device(db, caller, device_id)
-        profile = await db.get(PortProfile, body.profile_id)
-        if profile is None or profile.site_id != device.site_id:
-            raise NotFoundError("Port profile not found at this site")
-        return port_config.profile_change(profile, enabled=body.enabled, bind=body.bind)
-    if body.bind:
-        raise ValidationFailedError("Binding needs a port profile")
-    return PortChange(
-        description=body.description,
-        enabled=body.enabled,
-        untagged=body.untagged,
-        tagged=frozenset(body.tagged) if body.tagged is not None else None,
-        clear_untagged=body.clear_untagged,
-        add_tagged=frozenset(body.add_tagged),
-        remove_tagged=frozenset(body.remove_tagged),
-    )
+    device = await get_device(db, caller, device_id)
+    return await build_change(db, device.site_id, body.model_dump())
 
 
 # --- Ports -----------------------------------------------------------------------------------
@@ -91,6 +76,16 @@ async def apply_ports(
     return {"plan": _plan_out(plan), "log": log}
 
 
+@router.post(
+    "/devices/{device_id}/ports/jobs", response_model=JobOut, status_code=status.HTTP_202_ACCEPTED
+)
+async def queue_ports(
+    device_id: int, body: PortChangeIn, db: Db, caller: CallerDep, runtime: RuntimeDep
+) -> object:
+    """Like ``ports/apply``, but in the background: answers with the queued job right away."""
+    return await jobs.enqueue_port_change(db, caller, runtime, device_id, body.model_dump())
+
+
 @router.post("/devices/{device_id}/ports/unbind")
 async def unbind_ports(
     device_id: int, body: PortIdsIn, db: Db, caller: CallerDep
@@ -112,6 +107,16 @@ async def apply_rename(
 ) -> object:
     plan, log = await device_rename.apply_rename(db, caller, runtime, device_id, body.name)
     return {"plan": _plan_out(plan), "log": log}
+
+
+@router.post(
+    "/devices/{device_id}/rename/jobs", response_model=JobOut, status_code=status.HTTP_202_ACCEPTED
+)
+async def queue_rename(
+    device_id: int, body: RenameIn, db: Db, caller: CallerDep, runtime: RuntimeDep
+) -> object:
+    """Like ``rename/apply``, but in the background."""
+    return await jobs.enqueue_rename(db, caller, runtime, device_id, body.name)
 
 
 # --- Site VLANs and sync ---------------------------------------------------------------------
@@ -289,8 +294,14 @@ async def create_job(body: JobIn, db: Db, caller: CallerDep, settings: AppSettin
 
 
 @router.get("/jobs", response_model=list[JobOut])
-async def list_jobs(db: Db, caller: CallerDep, site_id: int | None = None) -> object:
-    return await jobs.list_jobs(db, caller, site_id)
+async def list_jobs(
+    db: Db,
+    caller: CallerDep,
+    site_id: int | None = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> object:
+    """Newest first; without ``site_id`` the jobs of every site the caller can see."""
+    return await jobs.list_jobs(db, caller, site_id, limit)
 
 
 @router.get("/jobs/{job_id}", response_model=JobOut)

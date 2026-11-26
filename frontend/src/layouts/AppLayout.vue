@@ -20,6 +20,7 @@ import { APP_VERSION } from '@/changelog'
 import CesmaLogo from '@/components/CesmaLogo.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
 import PatchNotesDialog from '@/components/PatchNotesDialog.vue'
+import TaskPanel from '@/components/TaskPanel.vue'
 import { useNavigation } from '@/composables/useNavigation'
 import { useTheme } from '@/composables/useTheme'
 import { setLocale } from '@/i18n'
@@ -277,9 +278,12 @@ async function logout(): Promise<void> {
         <button type="button" class="btn btn-ghost btn-sm uppercase" @click="switchLocale">{{ locale }}</button>
       </header>
 
-      <main class="px-4 py-6 sm:px-6 lg:px-8">
+      <!-- room for the task list at the bottom -->
+      <main class="px-4 py-6 sm:px-6 lg:px-8" style="padding-bottom: calc(var(--taskbar-h, 0px) + 1.5rem)">
         <RouterView />
       </main>
     </div>
+
+    <TaskPanel :class="collapsed ? 'lg:left-16' : 'lg:left-64'" />
   </div>
 </template>

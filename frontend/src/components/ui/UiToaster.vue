@@ -11,7 +11,7 @@ const colors = { success: 'text-green-500', error: 'text-red-500', info: 'text-b
 </script>
 
 <template>
-  <div v-if="hostsToasts(props.host ?? null)" aria-live="assertive" class="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-end gap-3 p-4 sm:p-6">
+  <div v-if="hostsToasts(props.host ?? null)" aria-live="assertive" class="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-end gap-3 p-4 sm:p-6" :style="props.host == null ? { bottom: 'var(--taskbar-h, 0px)' } : undefined">
     <TransitionGroup
       enter-active-class="transition duration-200 ease-out"
       enter-from-class="translate-y-2 opacity-0"

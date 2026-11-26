@@ -84,6 +84,12 @@ class Job(Base):
         str_enum(JobStatus, 10), default=JobStatus.PENDING, index=True
     )
     site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"))
+    #: the switch a job changes (port change, rename); None for jobs over a whole site
+    device_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devices.id", ondelete="SET NULL"), index=True
+    )
+    #: what the job is about, for the task list (e.g. "sw01: 1/1/5, 1/1/6")
+    summary: Mapped[str] = mapped_column(String(255), default="")
     created_by: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(default=utcnow, index=True)
     started_at: Mapped[datetime | None]

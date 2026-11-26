@@ -507,6 +507,8 @@ class JobOut(ORM):
     kind: str
     status: str
     site_id: int | None
+    device_id: int | None
+    summary: str
     created_by: str
     created_at: UtcDatetime
     started_at: UtcDatetime | None

@@ -448,3 +448,78 @@ async def test_failed_login_test_shows_a_hint(
     assert "Authentication failed" in hint["detail"] and hint["device_id"] == device_id
     # the switch answers SNMP: a failed login does not make it offline
     assert (await alice.get(f"/devices/{device_id}")).json()["status"] == "online"
+
+
+# --- Port changes and renames as background jobs (task list) ---------------------------------
+
+
+async def test_port_change_as_job(
+    alice: AsyncClient, bob: AsyncClient, app, settings: Settings
+) -> None:  # type: ignore[no-untyped-def]
+    settings = await _simulated_app(app, settings)
+    device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
+    p5, p6 = await _port(alice, device_id, "5"), await _port(alice, device_id, "6")
+    site_id = (await alice.get(f"/devices/{device_id}")).json()["site_id"]
+
+    # errors still come back right away, nothing is queued
+    bad = await alice.post(f"/devices/{device_id}/ports/jobs", json={"port_ids": [999999]})
+    assert bad.status_code == 404
+    await grant(alice, "bob", {site_id: "viewer"})
+    denied = await bob.post(
+        f"/devices/{device_id}/ports/jobs", json={"port_ids": [p5["id"]], "enabled": False}
+    )
+    assert denied.status_code == 403
+
+    r = await alice.post(
+        f"/devices/{device_id}/ports/jobs",
+        json={"port_ids": [p5["id"], p6["id"]], "description": "Drucker"},
+    )
+    assert r.status_code == 202, r.text
+    job = r.json()
+    assert (job["kind"], job["status"], job["device_id"]) == ("port_change", "pending", device_id)
+    assert job["summary"] == "hp-2530-48g: 5, 6"
+    assert (await _port(alice, device_id, "5"))["description"] != "Drucker"  # not yet
+
+    await _run_jobs(app, settings)
+    done = (await alice.get(f"/jobs/{job['id']}")).json()
+    assert done["status"] == "done", done
+    assert "[simulated]" in done["log"]
+    assert (await _port(alice, device_id, "6"))["description"] == "Drucker"
+    # audited once, as the change itself (not as "job queued")
+    actions = [e["action"] for e in (await alice.get("/audit")).json()["items"]]
+    assert "port.update" in actions and "job.port_change" not in actions
+
+    # the task list: all visible sites, newest first, limited
+    listed = (await alice.get("/jobs", params={"limit": 1})).json()
+    assert [j["id"] for j in listed] == [job["id"]]
+
+
+async def test_rename_as_job(alice: AsyncClient, app, settings: Settings) -> None:  # type: ignore[no-untyped-def]
+    settings = await _simulated_app(app, settings)
+    device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
+    bad = await alice.post(f"/devices/{device_id}/rename/jobs", json={"name": "mit leerzeichen"})
+    assert bad.status_code == 422
+    job = (await alice.post(f"/devices/{device_id}/rename/jobs", json={"name": "sw-og-07"})).json()
+    assert job["summary"] == "hp-2530-48g → sw-og-07"
+    await _run_jobs(app, settings)
+    assert (await alice.get(f"/jobs/{job['id']}")).json()["status"] == "done"
+    assert (await alice.get(f"/devices/{device_id}")).json()["name"] == "sw-og-07"
+
+
+async def test_quick_jobs_have_their_own_lane(alice: AsyncClient, app, settings: Settings) -> None:  # type: ignore[no-untyped-def]
+    settings = await _simulated_app(app, settings)
+    device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
+    site_id = (await alice.get(f"/devices/{device_id}")).json()["site_id"]
+    p5 = await _port(alice, device_id, "5")
+    backup = (await alice.post("/jobs", json={"kind": "backup", "site_id": site_id})).json()
+    change = (
+        await alice.post(
+            f"/devices/{device_id}/ports/jobs", json={"port_ids": [p5["id"]], "enabled": False}
+        )
+    ).json()
+    async with app.state.database.sessionmaker() as db:
+        assert (await jobs.next_pending(db, quick=False)).id == backup["id"]  # type: ignore[union-attr]
+        assert (await jobs.next_pending(db, quick=True)).id == change["id"]  # type: ignore[union-attr]
+        # one job at a time per switch
+        assert await jobs.next_pending(db, quick=True, busy_devices={device_id}) is None
+        assert await jobs.next_pending(db, quick=True, exclude_ids={change["id"]}) is None

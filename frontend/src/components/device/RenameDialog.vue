@@ -2,16 +2,17 @@
 /** Renames the switch itself (hostname) and the device in cesma-ng, with a preview. */
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { api, type ApplyResult, type ChangePlan, type Device } from '@/api/client'
+import { api, type ChangePlan, type Device, type Job } from '@/api/client'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import UiSpinner from '@/components/ui/UiSpinner.vue'
 import { useNotify } from '@/composables/useNotify'
+import { useJobsStore } from '@/stores/jobs'
 
 const props = defineProps<{ device: Device }>()
 const open = defineModel<boolean>('open', { required: true })
-const emit = defineEmits<{ renamed: [] }>()
 const { t } = useI18n()
 const notify = useNotify()
+const jobs = useJobsStore()
 
 const name = ref('')
 const plan = ref<ChangePlan | null>(null)
@@ -32,18 +33,14 @@ async function preview(): Promise<void> {
   busy.value = false
 }
 
+/** Queue the rename and close; the task list follows it, the switch page reloads when done. */
 async function apply(): Promise<void> {
   busy.value = true
   const ok = await notify.run(async () => {
-    const result = await api.post<ApplyResult>(`/devices/${props.device.id}/rename/apply`, { name: name.value })
-    const simulated = result.log.some((line) => line.startsWith('[simulated]'))
-    notify.success(simulated ? `${t('change.applied')} – ${t('change.simulated')}` : t('change.applied'))
+    jobs.track(await api.post<Job>(`/devices/${props.device.id}/rename/jobs`, { name: name.value }))
   })
   busy.value = false
-  if (ok) {
-    open.value = false
-    emit('renamed')
-  }
+  if (ok) open.value = false
 }
 </script>
 

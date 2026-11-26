@@ -8,6 +8,17 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-26
+
+### Hinzugefügt
+
+- Auftragsleiste am unteren Bildschirmrand (wie „Letzte Aufgaben“ in vCenter): zeigt die letzten Aufträge aller sichtbaren Standorte mit Ziel, Fortschritt, wer sie gestartet hat, wann und wie lange sie gedauert haben. Eingeklappt bleibt eine Zeile mit den laufenden und wartenden Aufträgen. Ein Klick auf den Auftrag öffnet sein Protokoll, ein Klick auf das Ziel den Switch
+
+### Geändert
+
+- Port-Änderungen (Dialog sowie „Aktivieren“/„Deaktivieren“ in der Auswahl) und das Umbenennen eines Switches laufen jetzt als Auftrag im Hintergrund: Der Dialog schließt sofort nach „Übernehmen“, der Auftrag erscheint unten in der Auftragsleiste. Fehler in der Eingabe meldet der Dialog weiterhin direkt. Ist der Auftrag fertig, lädt die Switch-Seite neu; eigene Aufträge melden ihr Ende zusätzlich als Hinweis
+- Solche kurzen Änderungen warten nicht auf lange Aufträge wie das nächtliche Backup: Bis zu vier laufen gleichzeitig, pro Switch immer nur eine
+
 ## [0.19.0] - 2026-11-26
 
 ### Hinzugefügt

@@ -599,6 +599,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_id}/ports/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue Ports
+         * @description Like ``ports/apply``, but in the background: answers with the queued job right away.
+         */
+        post: operations["queue_ports_api_v1_devices__device_id__ports_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/{device_id}/ports/unbind": {
         parameters: {
             query?: never;
@@ -647,6 +667,26 @@ export interface paths {
         put?: never;
         /** Apply Rename */
         post: operations["apply_rename_api_v1_devices__device_id__rename_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_id}/rename/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue Rename
+         * @description Like ``rename/apply``, but in the background.
+         */
+        post: operations["queue_rename_api_v1_devices__device_id__rename_jobs_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -837,7 +877,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Jobs */
+        /**
+         * List Jobs
+         * @description Newest first; without ``site_id`` the jobs of every site the caller can see.
+         */
         get: operations["list_jobs_api_v1_jobs_get"];
         put?: never;
         /** Create Job */
@@ -1818,6 +1861,10 @@ export interface components {
             status: string;
             /** Site Id */
             site_id: number | null;
+            /** Device Id */
+            device_id: number | null;
+            /** Summary */
+            summary: string;
             /** Created By */
             created_by: string;
             /**
@@ -3980,6 +4027,41 @@ export interface operations {
             };
         };
     };
+    queue_ports_api_v1_devices__device_id__ports_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortChangeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     unbind_ports_api_v1_devices__device_id__ports_unbind_post: {
         parameters: {
             query?: never;
@@ -4074,6 +4156,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    queue_rename_api_v1_devices__device_id__rename_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
                 };
             };
             /** @description Validation Error */
@@ -4553,6 +4670,7 @@ export interface operations {
         parameters: {
             query?: {
                 site_id?: number | null;
+                limit?: number;
             };
             header?: never;
             path?: never;

@@ -18,6 +18,7 @@ import { useConfirm, useConfirmDelete } from '@/composables/useConfirm'
 import { useJobWatcher } from '@/composables/useJobWatcher'
 import { useNotify } from '@/composables/useNotify'
 import { useAuthStore } from '@/stores/auth'
+import { useJobsStore } from '@/stores/jobs'
 import { useSitesStore } from '@/stores/sites'
 import { formatDateTime, formatUptime } from '@/utils/format'
 import UiMenu from '@/components/ui/UiMenu.vue'
@@ -146,6 +147,13 @@ watch(autoRefresh, (on) => {
   }
 })
 useAutoRefresh(() => fetchAll().catch(() => undefined), autoRefresh)
+
+// A change of this switch (port dialog, rename) finished in the background: show the result.
+onUnmounted(
+  useJobsStore().onFinished((job) => {
+    if (job.device_id === props.id) void fetchAll().catch(() => undefined)
+  }),
+)
 
 let reloadTimer: ReturnType<typeof setTimeout> | undefined
 async function refresh(): Promise<void> {
@@ -291,7 +299,7 @@ watch(() => props.id, load, { immediate: true })
       </dl>
     </section>
 
-    <RenameDialog v-model:open="renameOpen" :device="device" @renamed="load" />
+    <RenameDialog v-model:open="renameOpen" :device="device" />
     <DeviceFormDialog v-model:open="editOpen" :device="device" @saved="(d) => (device = d)" />
   </div>
 </template>
