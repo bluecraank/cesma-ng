@@ -25,7 +25,7 @@ from app.drivers.writers import (
     WriteError,
 )
 from app.transports.cli import FakeCli
-from app.transports.http import FakeHttp
+from app.transports.http import FakeHttp, HttpError
 
 CREDS = DeviceCredentials(
     api=LoginCredentials(username="admin", password="pw"),
@@ -238,6 +238,27 @@ async def test_arubaos_backup_decodes_cli_output() -> None:
     )
     w = ArubaOsRestWriter("sw", CREDS, http_factory=lambda base: http)
     assert await w.running_config() == config
+
+
+async def test_arubaos_falls_back_to_v7_when_version_needs_login() -> None:
+    # some 2530 firmware answers /rest/version with 400 "Please login to access the resource"
+    http = FakeHttp(
+        {
+            ("GET", "/rest/version"): HttpError("HTTP 400 Please login", status=400),
+            ("POST", "/rest/v7/login-sessions"): {"cookie": "sessionId=abc"},
+            ("POST", "/rest/v7/cli"): {"result_base64_encoded": base64.b64encode(b"x").decode()},
+        }
+    )
+    w = ArubaOsRestWriter("sw", CREDS, http_factory=lambda base: http)
+    assert await w.running_config() == "x"
+
+
+async def test_arubaos_unreachable_switch_is_reported() -> None:
+    http = FakeHttp({("GET", "/rest/version"): HttpError("Connection refused")})
+    w = ArubaOsRestWriter("sw", CREDS, http_factory=lambda base: http)
+    with pytest.raises(WriteError, match="Connection refused"):
+        await w.running_config()
+    assert http.closed
 
 
 async def test_arubaos_push_only_uploads_keys() -> None:

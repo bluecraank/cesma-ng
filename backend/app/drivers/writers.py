@@ -458,7 +458,13 @@ class ArubaOsRestWriter(RestWriter):
     async def _session(self) -> "_ArubaOsSession":
         http = self._http_factory(self.base_url)
         try:
-            versions = await http.request("GET", "/rest/version")
+            try:
+                versions = await http.request("GET", "/rest/version")
+            except HttpError as exc:
+                if exc.status is None:  # switch not reachable: report that
+                    raise
+                # some firmware answers 400 "Please login" here: use v7 (cesma-on-premise did)
+                versions = None
             elements = (versions or {}).get("version_element") or [{"version": "v7"}]
             api = f"/rest/{elements[-1]['version'].split('.')[0]}"
             login = await http.request(

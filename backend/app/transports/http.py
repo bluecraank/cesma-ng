@@ -73,7 +73,7 @@ class HttpxClient:
 
 
 class FakeHttp:
-    """Records calls; answers from ``responses[(method, path)]`` (default: None)."""
+    """Records calls; answers from ``responses[(method, path)]``; exceptions are raised."""
 
     def __init__(self, responses: dict[tuple[str, str], Any] | None = None) -> None:
         self.responses = responses or {}
@@ -91,7 +91,10 @@ class FakeHttp:
         read_timeout: float | None = None,
     ) -> Any:
         self.calls.append((method, path, json if json is not None else data))
-        return self.responses.get((method, path))
+        response = self.responses.get((method, path))
+        if isinstance(response, Exception):
+            raise response
+        return response
 
     async def close(self) -> None:
         self.closed = True

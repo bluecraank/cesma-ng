@@ -8,6 +8,12 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-11-26
+
+### Behoben
+
+- HP/Aruba 2530: Backups, Änderungen und Login-Test scheiterten mit „GET /rest/version: HTTP 400 … Please login to access the resource“, wenn die Firmware die API-Version erst nach der Anmeldung verrät. Cesma nutzt dann wie cesma-on-premise die API-Version v7
+
 ## [0.17.0] - 2026-11-25
 
 ### Hinzugefügt
