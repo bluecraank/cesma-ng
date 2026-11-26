@@ -11,9 +11,9 @@ import { useJobWatcher } from '@/composables/useJobWatcher'
 import { useNotify } from '@/composables/useNotify'
 import { useAuthStore } from '@/stores/auth'
 import { useSitesStore } from '@/stores/sites'
-import { formatDateTime } from '@/utils/format'
+import UiTime from '@/components/ui/UiTime.vue'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const notify = useNotify()
 const confirmDelete = useConfirmDelete()
 const { confirm } = useConfirm()
@@ -117,7 +117,7 @@ onMounted(load)
               <span v-else class="badge badge-yellow" :title="t('sshKeys.noOwnerHint')">{{ t('sshKeys.noOwner') }}</span>
             </td>
             <td class="font-mono text-xs">{{ k.fingerprint }}</td>
-            <td class="whitespace-nowrap">{{ formatDateTime(k.created_at, locale) }}</td>
+            <td class="whitespace-nowrap"><UiTime :value="k.created_at" /></td>
             <td>
               <button v-if="canDelete(k)" type="button" class="btn-icon hover:!text-red-600" :title="t('common.delete')" @click="remove(k)"><TrashIcon class="size-4" /></button>
             </td>

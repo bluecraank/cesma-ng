@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BoltIcon, LinkIcon, ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PencilSquareIcon, XMarkIcon } from '@heroicons/vue/20/solid'
+import { BoltIcon, LinkIcon, ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PauseCircleIcon, PencilSquareIcon, PlayCircleIcon, XMarkIcon } from '@heroicons/vue/20/solid'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api, type DeviceVlan, type FdbEntry, type Port } from '@/api/client'
@@ -8,12 +8,16 @@ import UiColumnMenu from '@/components/ui/UiColumnMenu.vue'
 import UiCsvButton from '@/components/ui/UiCsvButton.vue'
 import UiSortTh from '@/components/ui/UiSortTh.vue'
 import { useColumns } from '@/composables/useColumns'
+import { useConfirm } from '@/composables/useConfirm'
+import { useNotify } from '@/composables/useNotify'
 import { useTableSort } from '@/composables/useTableSort'
 import TrafficChart from './TrafficChart.vue'
 import type { components } from '@/api/schema'
 import { csvDate, downloadCsv } from '@/utils/csv'
 import { formatDateTime } from '@/utils/format'
 import { shortVendor } from '@/utils/vendor'
+import UiTime from '@/components/ui/UiTime.vue'
+import { useQueryFlag, useQueryParam } from '@/composables/useQueryState'
 
 const props = defineProps<{
   deviceId: number
@@ -31,9 +35,9 @@ const props = defineProps<{
 const emit = defineEmits<{ changed: [] }>()
 const { t, locale } = useI18n()
 
-const search = ref('')
-const onlyUp = ref(false)
-const onlyUplinks = ref(false)
+const search = useQueryParam('q')
+const onlyUp = useQueryFlag('up')
+const onlyUplinks = useQueryFlag('uplinks')
 const expanded = ref<number | null>(null)
 const macs = ref<FdbEntry[]>([])
 const stats = ref<components['schemas']['PortStatsOut'] | null>(null)
@@ -97,6 +101,35 @@ function onApplied(): void {
   emit('changed')
 }
 
+const { confirm } = useConfirm()
+const notify = useNotify()
+const switching = ref(false)
+
+/** Switch the selected ports on or off right away (after a confirmation), without the dialog. */
+async function setEnabled(on: boolean): Promise<void> {
+  const ports = selectedPorts.value
+  const uplinks = ports.filter((p) => p.is_uplink).map((p) => p.name)
+  const message = [
+    t(on ? 'change.enableConfirm' : 'change.disableConfirm', { ports: ports.map((p) => p.name).join(', ') }),
+    !on && uplinks.length ? t('change.disableUplink', { ports: uplinks.join(', ') }) : '',
+  ]
+  const ok = await confirm({
+    title: t(on ? 'change.enableTitle' : 'change.disableTitle', ports.length),
+    message: message.filter(Boolean).join(' '),
+    confirmLabel: t(on ? 'change.enable' : 'change.disable'),
+    cancelLabel: t('common.cancel'),
+    danger: !on,
+  })
+  if (!ok) return
+  switching.value = true
+  const done = await notify.run(
+    () => api.post(`/devices/${props.deviceId}/ports/apply`, { port_ids: ports.map((p) => p.id), enabled: on }),
+    t('change.applied'),
+  )
+  switching.value = false
+  if (done) onApplied()
+}
+
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
   return props.ports.filter(
@@ -121,7 +154,7 @@ const { sort, sorted: rows } = useTableSort(() => filtered.value, {
   neighbor: (p) => p.neighbor,
   macs: (p) => p.mac_count || null,
   lastChange: (p) => p.last_change_at,
-})
+}, null, true, 'sort')
 
 // Port and status always stay; everything else can be hidden.
 const OPTIONAL = ['description', 'untagged', 'tagged', 'poe', 'neighbor', 'macs', 'lastChange'] as const
@@ -217,6 +250,12 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
       <span class="truncate font-mono text-xs text-brand-100">{{ selectedPorts.map((p) => p.name).join(', ') }}</span>
       <span class="hidden text-xs text-brand-200 lg:inline">{{ t('change.shiftHint') }}</span>
       <div class="ml-auto flex gap-2">
+        <button type="button" class="btn btn-sm bg-white/10 text-white hover:bg-white/20" :disabled="switching" @click="setEnabled(true)">
+          <PlayCircleIcon class="size-4" /> {{ t('change.enable') }}
+        </button>
+        <button type="button" class="btn btn-sm bg-white/10 text-white hover:bg-white/20" :disabled="switching" @click="setEnabled(false)">
+          <PauseCircleIcon class="size-4" /> {{ t('change.disable') }}
+        </button>
         <button type="button" class="btn btn-sm bg-white text-brand-700 hover:bg-brand-50" @click="edit(selectedPorts)">
           <PencilSquareIcon class="size-4" /> {{ t('change.editPorts', selected.size) }}
         </button>
@@ -293,7 +332,7 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
               </td>
               <td v-if="cols.shows('macs')" class="text-right tabular-nums">{{ p.mac_count || '' }}</td>
               <td v-if="cols.shows('lastChange')" class="text-xs whitespace-nowrap text-gray-500 tabular-nums dark:text-gray-400">
-                {{ p.last_change_at ? formatDateTime(p.last_change_at, locale) : '' }}
+                <UiTime :value="p.last_change_at" empty="" />
               </td>
               <td v-if="canEdit" @click.stop>
                 <button type="button" class="btn-icon" :title="t('change.edit')" @click="edit([p])"><PencilSquareIcon class="size-4" /></button>
@@ -357,6 +396,6 @@ const poeBadge = { delivering: 'badge-green', searching: 'badge-gray', disabled:
       </table>
     </div>
 
-    <PortEditDialog v-model:open="editOpen" :device-id="deviceId" :site-id="siteId" :ports="editPorts" :vlans="vlans" @applied="onApplied" />
+    <PortEditDialog v-model:open="editOpen" :device-id="deviceId" :site-id="siteId" :ports="editPorts" :all-ports="ports" :vlans="vlans" @applied="onApplied" />
   </div>
 </template>

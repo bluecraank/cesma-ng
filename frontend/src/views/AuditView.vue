@@ -6,7 +6,8 @@ import { api, type AuditEntry, type AuditPage } from '@/api/client'
 import { useNotify } from '@/composables/useNotify'
 import { useSitesStore } from '@/stores/sites'
 import { auditMessage } from '@/utils/auditMessage'
-import { formatDateTime } from '@/utils/format'
+import UiTime from '@/components/ui/UiTime.vue'
+import { useQueryParam } from '@/composables/useQueryState'
 
 const PAGE_SIZE = 50
 const { t, locale } = useI18n()
@@ -16,7 +17,7 @@ const sites = useSitesStore()
 const entries = ref<AuditEntry[]>([])
 const total = ref(0)
 const offset = ref(0)
-const search = ref('')
+const search = useQueryParam('q')
 
 const pageInfo = computed(() =>
   total.value ? `${offset.value + 1}–${Math.min(offset.value + PAGE_SIZE, total.value)} / ${total.value}` : '0',
@@ -91,7 +92,7 @@ function changes(entry: AuditEntry): { key: string; old: string; new: string }[]
           </thead>
           <tbody>
             <tr v-for="e in entries" :key="e.id">
-              <td class="whitespace-nowrap tabular-nums">{{ formatDateTime(e.created_at, locale) }}</td>
+              <td class="whitespace-nowrap tabular-nums"><UiTime :value="e.created_at" /></td>
               <td><span class="badge" :class="levelBadge[e.level]">{{ t(`audit.levels.${e.level}`) }}</span></td>
               <td class="font-mono text-xs whitespace-nowrap">{{ e.action }}</td>
               <td class="whitespace-nowrap">{{ e.actor_name }}</td>

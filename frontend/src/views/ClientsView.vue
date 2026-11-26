@@ -12,6 +12,8 @@ import { useSitesStore } from '@/stores/sites'
 import { shortVendor } from '@/utils/vendor'
 import { csvDate, downloadCsv } from '@/utils/csv'
 import { formatDateTime } from '@/utils/format'
+import UiTime from '@/components/ui/UiTime.vue'
+import { useQueryFlag } from '@/composables/useQueryState'
 
 const PAGE_SIZE = 100
 const { t, locale } = useI18n()
@@ -25,7 +27,7 @@ const total = ref(0)
 const offset = ref(0)
 // The search lives in the URL, so a search can be shared as a link.
 const query = ref(typeof route.query.q === 'string' ? route.query.q : '')
-const activeOnly = ref(false)
+const activeOnly = useQueryFlag('active')
 
 const pageInfo = computed(() =>
   total.value ? `${offset.value + 1}–${Math.min(offset.value + PAGE_SIZE, total.value)} / ${total.value}` : '0',
@@ -172,7 +174,7 @@ watch(
               <td class="whitespace-nowrap">
                 <span v-if="c.active" class="badge badge-green">{{ t('clients.active') }}</span>
                 <span v-else class="text-xs text-gray-500 tabular-nums" :title="`${t('clients.firstSeen')}: ${formatDateTime(c.first_seen_at, locale)}`">
-                  {{ formatDateTime(c.last_seen_at, locale) }}
+                  <UiTime :value="c.last_seen_at" />
                 </span>
               </td>
             </tr>

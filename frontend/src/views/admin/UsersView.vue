@@ -9,9 +9,9 @@ import UiDialog from '@/components/ui/UiDialog.vue'
 import UiToggle from '@/components/ui/UiToggle.vue'
 import { useNotify } from '@/composables/useNotify'
 import { useSitesStore } from '@/stores/sites'
-import { formatDateTime } from '@/utils/format'
+import UiTime from '@/components/ui/UiTime.vue'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const notify = useNotify()
 const sites = useSitesStore()
 
@@ -99,7 +99,7 @@ onMounted(load)
             <td>
               <span class="badge" :class="u.is_active ? 'badge-green' : 'badge-gray'">{{ u.is_active ? t('common.yes') : t('common.no') }}</span>
             </td>
-            <td class="whitespace-nowrap tabular-nums">{{ formatDateTime(u.last_login_at, locale) }}</td>
+            <td class="whitespace-nowrap tabular-nums"><UiTime :value="u.last_login_at" /></td>
             <td>
               <button type="button" class="btn-icon" :title="t('common.edit')" @click="edit(u)">
                 <PencilSquareIcon class="size-4" />

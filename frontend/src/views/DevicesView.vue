@@ -2,7 +2,6 @@
 import { CheckIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, PlusIcon, SignalIcon, XMarkIcon } from '@heroicons/vue/20/solid'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
 import { api, type Device, type DeviceHint } from '@/api/client'
 import DeviceFormDialog from '@/components/DeviceFormDialog.vue'
 import DiscoverDialog from '@/components/DiscoverDialog.vue'
@@ -20,9 +19,10 @@ import { useTableSort } from '@/composables/useTableSort'
 import { useAuthStore } from '@/stores/auth'
 import { useSitesStore } from '@/stores/sites'
 import { csvDate, downloadCsv } from '@/utils/csv'
-import { formatDateTime } from '@/utils/format'
+import UiTime from '@/components/ui/UiTime.vue'
+import { useQueryParam } from '@/composables/useQueryState'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const notify = useNotify()
 const auth = useAuthStore()
 const sites = useSitesStore()
@@ -32,13 +32,10 @@ const hints = ref<DeviceHint[]>([])
 const hintsOf = (id: number): DeviceHint[] => hints.value.filter((h) => h.device_id === id)
 const devicesWithHints = computed(() => new Set(hints.value.map((h) => h.device_id)).size)
 const loading = ref(false)
-const search = ref('')
+const search = useQueryParam('q')
 // status filter, also set from the dashboard (?status=offline)
-const route = useRoute()
-const router = useRouter()
 const STATUS_FILTERS = ['online', 'offline', 'unknown', 'unconfirmed'] as const
-const statusFilter = ref(typeof route.query.status === 'string' ? route.query.status : '')
-watch(statusFilter, (status) => void router.replace({ query: { ...route.query, status: status || undefined } }))
+const statusFilter = useQueryParam('status')
 const dialogOpen = ref(false)
 const discoverOpen = ref(false)
 const confirmDelete = useConfirmDelete()
@@ -141,6 +138,8 @@ const { sort, sorted: rows } = useTableSort(
     last_seen_at: (d) => d.last_seen_at,
   },
   'name',
+  true,
+  'sort',
 )
 
 watch(() => sites.currentId, load, { immediate: true })
@@ -225,7 +224,7 @@ watch(() => sites.currentId, load, { immediate: true })
             <td v-if="cols.shows('model')">{{ d.model_name || t(`device.models.${d.model}`) }}</td>
             <td v-if="cols.shows('firmware')">{{ d.firmware || '—' }}</td>
             <td v-if="cols.shows('status')"><DeviceStatusTag :status="d.status" /></td>
-            <td v-if="cols.shows('last_seen_at')" class="whitespace-nowrap tabular-nums">{{ formatDateTime(d.last_seen_at, locale) }}</td>
+            <td v-if="cols.shows('last_seen_at')" class="whitespace-nowrap tabular-nums"><UiTime :value="d.last_seen_at" /></td>
           </tr>
           <tr v-if="loading">
             <td :colspan="shownColumns.length + 1" class="py-8"><UiSpinner class="mx-auto" /></td>

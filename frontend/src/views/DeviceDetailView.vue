@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowPathIcon, ChevronLeftIcon, KeyIcon, PencilSquareIcon, TagIcon, TrashIcon } from '@heroicons/vue/20/solid'
+import { ArrowPathIcon, ChevronLeftIcon, KeyIcon, PauseIcon, PencilSquareIcon, PlayIcon, TagIcon, TrashIcon } from '@heroicons/vue/20/solid'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -12,6 +12,8 @@ import DeviceStatusTag from '@/components/DeviceStatusTag.vue'
 import PortsTab from '@/components/device/PortsTab.vue'
 import RenameDialog from '@/components/device/RenameDialog.vue'
 import SimpleTabs from '@/components/device/SimpleTabs.vue'
+import UiTime from '@/components/ui/UiTime.vue'
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useConfirm, useConfirmDelete } from '@/composables/useConfirm'
 import { useJobWatcher } from '@/composables/useJobWatcher'
 import { useNotify } from '@/composables/useNotify'
@@ -95,28 +97,55 @@ const facts = computed(() => {
   ]
 })
 
-async function load(): Promise<void> {
-  await notify.run(async () => {
-    const base = `/devices/${props.id}`
-    const [d, p, v, f, l, s, b] = await Promise.all([
-      api.get<Device>(base),
-      api.get<Port[]>(`${base}/ports`),
-      api.get<DeviceVlan[]>(`${base}/vlans`),
-      api.get<FdbEntry[]>(`${base}/fdb`),
-      api.get<LldpNeighbor[]>(`${base}/lldp`),
-      api.get<PollState[]>(`${base}/poll-state`),
-      api.get<Backup[]>('/backups', { device_id: props.id }),
-    ])
-    device.value = d
-    ports.value = p
-    vlans.value = v
-    fdb.value = f
-    lldp.value = l
-    poll.value = s
-    backups.value = b
-    hints.value = (await api.get<DeviceHint[]>(`/sites/${d.site_id}/device-hints`).catch(() => [])).filter((h) => h.device_id === d.id)
-  })
+/** When the shown data was loaded (the worker polls the switch in the background). */
+const loadedAt = ref<string | null>(null)
+
+async function fetchAll(): Promise<void> {
+  const id = props.id
+  const base = `/devices/${id}`
+  const [d, p, v, f, l, s, b] = await Promise.all([
+    api.get<Device>(base),
+    api.get<Port[]>(`${base}/ports`),
+    api.get<DeviceVlan[]>(`${base}/vlans`),
+    api.get<FdbEntry[]>(`${base}/fdb`),
+    api.get<LldpNeighbor[]>(`${base}/lldp`),
+    api.get<PollState[]>(`${base}/poll-state`),
+    api.get<Backup[]>('/backups', { device_id: id }),
+  ])
+  if (id !== props.id) return // another switch was opened meanwhile
+  device.value = d
+  ports.value = p
+  vlans.value = v
+  fdb.value = f
+  lldp.value = l
+  poll.value = s
+  backups.value = b
+  hints.value = (await api.get<DeviceHint[]>(`/sites/${d.site_id}/device-hints`).catch(() => [])).filter((h) => h.device_id === d.id)
+  loadedAt.value = new Date().toISOString()
 }
+
+async function load(): Promise<void> {
+  await notify.run(fetchAll)
+}
+
+// Reload what the worker found every 30 s while the page is visible; failures stay quiet here.
+const AUTO_KEY = 'cesma.autoRefresh'
+const autoRefresh = ref(readAuto())
+function readAuto(): boolean {
+  try {
+    return localStorage.getItem(AUTO_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+watch(autoRefresh, (on) => {
+  try {
+    localStorage.setItem(AUTO_KEY, on ? '1' : '0')
+  } catch {
+    /* storage unavailable */
+  }
+})
+useAutoRefresh(() => fetchAll().catch(() => undefined), autoRefresh)
 
 let reloadTimer: ReturnType<typeof setTimeout> | undefined
 async function refresh(): Promise<void> {
@@ -180,12 +209,25 @@ watch(() => props.id, load, { immediate: true })
           <template v-if="device.firmware"> · {{ device.firmware }}</template>
           <template v-if="ports.length"> · {{ portsUp }}/{{ ports.length }} {{ t('ports.up') }}</template>
           <template v-if="device.uptime_seconds"> · {{ t('device.uptime') }} {{ formatUptime(device.uptime_seconds) }}</template>
+          <template v-if="loadedAt"> · {{ t('poll.loaded') }} <UiTime :value="loadedAt" /></template>
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
-        <button type="button" class="btn btn-secondary" :disabled="refreshing" @click="refresh">
-          <ArrowPathIcon class="size-4" :class="{ 'animate-spin': refreshing }" /> {{ t('poll.refresh') }}
-        </button>
+        <div class="flex">
+          <button type="button" class="btn btn-secondary rounded-r-none" :disabled="refreshing" @click="refresh">
+            <ArrowPathIcon class="size-4" :class="{ 'animate-spin': refreshing }" /> {{ t('poll.refresh') }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary -ml-px rounded-l-none px-2"
+            :title="autoRefresh ? t('poll.autoOn') : t('poll.autoOff')"
+            :aria-pressed="autoRefresh"
+            @click="autoRefresh = !autoRefresh"
+          >
+            <PauseIcon v-if="autoRefresh" class="size-4" />
+            <PlayIcon v-else class="size-4 text-gray-400" />
+          </button>
+        </div>
         <button v-if="canManage" type="button" class="btn btn-secondary" @click="editOpen = true">
           <PencilSquareIcon class="size-4" /> {{ t('common.edit') }}
         </button>

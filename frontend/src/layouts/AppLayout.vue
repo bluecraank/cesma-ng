@@ -2,40 +2,25 @@
 import {
   ArrowRightStartOnRectangleIcon,
   Bars3Icon,
-  ArchiveBoxIcon,
   BellIcon,
-  ChartBarIcon,
-  ClipboardDocumentCheckIcon,
-  ShareIcon,
-  CommandLineIcon,
-  QueueListIcon,
-  RectangleStackIcon,
-  ShieldCheckIcon,
-  CpuChipIcon,
-  GlobeAltIcon,
-  MagnifyingGlassIcon,
-  UserGroupIcon,
   BuildingOffice2Icon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
-  ClipboardDocumentListIcon,
-  HomeIcon,
-  KeyIcon,
+  ChevronDownIcon,
+  MagnifyingGlassIcon,
   MoonIcon,
-  ServerStackIcon,
   SunIcon,
-  UsersIcon,
-  ViewfinderCircleIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { APP_VERSION } from '@/changelog'
 import CesmaLogo from '@/components/CesmaLogo.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
 import PatchNotesDialog from '@/components/PatchNotesDialog.vue'
+import { useNavigation } from '@/composables/useNavigation'
 import { useTheme } from '@/composables/useTheme'
 import { setLocale } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -47,6 +32,8 @@ const auth = useAuthStore()
 const sites = useSitesStore()
 const notifications = useNotificationsStore()
 const router = useRouter()
+const route = useRoute()
+const { sections, itemFor } = useNavigation()
 const { theme, toggle } = useTheme()
 const mobileOpen = ref(false)
 const COLLAPSED_KEY = 'cesma.sidebarCollapsed'
@@ -89,36 +76,42 @@ onMounted(() => {
   }
 })
 
-const sections = computed(() => [
-  {
-    items: [
-      { to: '/', icon: HomeIcon, label: t('nav.dashboard') },
-      { to: '/devices', icon: ServerStackIcon, label: t('nav.devices') },
-      { to: '/clients', icon: UserGroupIcon, label: t('nav.clients') },
-      { to: '/topology', icon: ShareIcon, label: t('nav.topology') },
-      { to: '/vlans', icon: QueueListIcon, label: t('nav.vlans') },
-      { to: '/backups', icon: ArchiveBoxIcon, label: t('nav.backups') },
-      { to: '/notifications', icon: BellIcon, label: t('nav.notifications') },
-      { to: '/switchports', icon: ViewfinderCircleIcon, label: t('nav.switchports') },
-      { to: '/compliance', icon: ClipboardDocumentCheckIcon, label: t('nav.compliance') },
-      { to: '/reports', icon: ChartBarIcon, label: t('nav.reports') },
-      { to: '/audit', icon: ClipboardDocumentListIcon, label: t('nav.audit') },
-    ],
-  },
-  {
-    title: t('nav.administration'),
-    items: [
-      { to: '/admin/sites', icon: BuildingOffice2Icon, label: t('nav.sites'), show: true },
-      { to: '/admin/ssh-keys', icon: CommandLineIcon, label: t('nav.sshKeys'), show: true },
-      { to: '/admin/jobs', icon: RectangleStackIcon, label: t('nav.jobs'), show: true },
-      { to: '/admin/users', icon: UsersIcon, label: t('nav.users'), show: auth.isSuperadmin },
-      { to: '/admin/roles', icon: ShieldCheckIcon, label: t('nav.roles'), show: auth.isSuperadmin },
-      { to: '/admin/credentials', icon: KeyIcon, label: t('nav.credentials'), show: auth.isSuperadmin },
-      { to: '/admin/mac-types', icon: CpuChipIcon, label: t('nav.macTypes'), show: auth.isSuperadmin },
-      { to: '/admin/gateways', icon: GlobeAltIcon, label: t('nav.gateways'), show: auth.isSuperadmin },
-    ].filter((item) => item.show),
-  },
-])
+/** Menu entry of the current page; also highlights it on sub pages (a switch -> "Switches"). */
+const activeItem = computed(() => itemFor(route.path))
+
+// Browser tab: "Switches · Site · cesma-ng", so several open tabs can be told apart.
+watchEffect(() => {
+  const site = sites.sites.find((s) => s.id === sites.currentId)?.name
+  document.title = [activeItem.value?.label, site, 'cesma-ng'].filter(Boolean).join(' · ')
+})
+
+// Sections can be folded away; remembered per browser.
+const FOLDED_KEY = 'cesma.foldedSections'
+const folded = ref<string[]>(readList(FOLDED_KEY))
+
+function readList(key: string): string[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(key) ?? '[]')
+    return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function toggleSection(key: string): void {
+  folded.value = folded.value.includes(key) ? folded.value.filter((k) => k !== key) : [...folded.value, key]
+  try {
+    localStorage.setItem(FOLDED_KEY, JSON.stringify(folded.value))
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** A folded section still shows the entry of the current page. */
+function visibleItems(section: (typeof sections.value)[number]) {
+  if (compact.value || !section.title || !folded.value.includes(section.key)) return section.items
+  return section.items.filter((item) => item.to === activeItem.value?.to)
+}
 
 const initials = computed(() =>
   (auth.user?.display_name || auth.user?.username || '?')
@@ -171,20 +164,39 @@ async function logout(): Promise<void> {
       </div>
 
       <nav class="sidebar-scroll flex flex-1 flex-col gap-6 overflow-x-hidden overflow-y-auto py-2" :class="compact ? 'px-2' : 'px-4'" @click="mobileOpen = false">
-        <div v-for="(section, i) in sections" :key="i">
-          <div v-if="section.title && !compact" class="mb-2 px-2 text-xs font-semibold whitespace-nowrap text-gray-500">{{ section.title }}</div>
+        <div v-for="section in sections" :key="section.key">
+          <button
+            v-if="section.title && !compact"
+            type="button"
+            class="group mb-2 flex w-full items-center justify-between rounded px-2 text-xs font-semibold whitespace-nowrap text-gray-500 hover:text-gray-300"
+            :aria-expanded="!folded.includes(section.key)"
+            @click.stop="toggleSection(section.key)"
+          >
+            <span>{{ section.title }}</span>
+            <ChevronDownIcon
+              class="size-3.5 opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100"
+              :class="folded.includes(section.key) && '-rotate-90 opacity-100'"
+            />
+          </button>
           <div v-else-if="section.title" class="mx-2 mb-2 border-t border-white/10" />
           <ul class="space-y-1">
-            <li v-for="item in section.items" :key="item.to">
+            <li v-for="item in visibleItems(section)" :key="item.to">
               <RouterLink
                 :to="item.to"
-                class="group flex items-center gap-x-3 rounded-md py-2 text-sm font-medium whitespace-nowrap text-gray-400 hover:bg-white/5 hover:text-white"
-                :class="compact ? 'justify-center px-0' : 'px-2'"
-                exact-active-class="!bg-white/5 !text-white"
+                class="group relative flex items-center gap-x-3 rounded-md py-2 text-sm font-medium whitespace-nowrap hover:bg-white/5 hover:text-white"
+                :class="[compact ? 'justify-center px-0' : 'px-2', item.to === activeItem?.to ? 'bg-white/5 text-white' : 'text-gray-400']"
+                :aria-current="item.to === activeItem?.to ? 'page' : undefined"
                 :title="compact ? item.label : undefined"
               >
                 <component :is="item.icon" class="size-5 shrink-0" />
-                <span v-if="!compact">{{ item.label }}</span>
+                <span v-if="!compact" class="flex-1">{{ item.label }}</span>
+                <span
+                  v-if="item.badge === 'notifications' && notifications.open"
+                  class="flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] leading-5 font-semibold text-white"
+                  :class="compact && 'absolute top-0.5 right-0.5 min-w-4 px-1 leading-4'"
+                >
+                  {{ notifications.open > 99 ? '99+' : notifications.open }}
+                </span>
               </RouterLink>
             </li>
           </ul>

@@ -9,9 +9,8 @@ import {
   PlusIcon,
   TrashIcon,
 } from '@heroicons/vue/20/solid'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
 import { api, type ChangePlan, type Job, type PortProfile, type SiteVlan, type SiteVlanIn } from '@/api/client'
 import UiCsvButton from '@/components/ui/UiCsvButton.vue'
 import UiDialog from '@/components/ui/UiDialog.vue'
@@ -27,6 +26,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSitesStore } from '@/stores/sites'
 import { downloadCsv } from '@/utils/csv'
 import { vlanMatcher } from '@/utils/vlanFilter'
+import { useQueryParam } from '@/composables/useQueryState'
 
 const { t } = useI18n()
 const notify = useNotify()
@@ -35,7 +35,8 @@ const auth = useAuthStore()
 const sites = useSitesStore()
 
 // ?tab=profiles opens the port profiles directly (linked from the port dialog)
-const tab = ref<'vlans' | 'profiles'>(useRoute().query.tab === 'profiles' ? 'profiles' : 'vlans')
+const tab = useQueryParam('tab', 'vlans') as Ref<'vlans' | 'profiles'>
+if (tab.value !== 'profiles') tab.value = 'vlans'
 const vlans = ref<SiteVlan[]>([])
 const profiles = ref<PortProfile[]>([])
 const canAdmin = computed(() => auth.can('vlans.manage', sites.currentId))
@@ -53,9 +54,10 @@ async function load(): Promise<void> {
 watch(() => sites.currentId, load, { immediate: true })
 
 // --- Search, filter and sorting (one search field for both tabs) ---
-const search = ref('')
+const search = useQueryParam('q')
 const FLAGS = ['incomplete', 'mismatch', 'client', 'scan'] as const
-const flag = ref<'' | (typeof FLAGS)[number]>('')
+const flag = useQueryParam('filter') as Ref<'' | (typeof FLAGS)[number]>
+if (flag.value && !(FLAGS as readonly string[]).includes(flag.value)) flag.value = ''
 const hasFlag: Record<(typeof FLAGS)[number], (v: SiteVlan) => boolean> = {
   incomplete: (v) => v.devices_with_vlan < v.device_count,
   mismatch: (v) => v.devices_name_mismatch > 0,
@@ -74,7 +76,7 @@ const { sort: vlanSort, sorted: vlanRows } = useTableSort(() => filteredVlans.va
   name: (v) => v.name,
   ipRange: (v) => v.ip_range,
   presence: (v) => (v.device_count ? v.devices_with_vlan / v.device_count : null),
-})
+}, null, true, 'sort')
 
 /** A profile matches by its name or by one of its VLANs. */
 const filteredProfiles = computed(() => {
@@ -93,7 +95,7 @@ const { sort: profileSort, sorted: profileRows } = useTableSort(() => filteredPr
   tagged: (p) => p.tagged_vids.length || null,
   description: (p) => p.description,
   bound: (p) => p.bound_ports || null,
-})
+}, null, true, 'psort')
 
 function exportCsv(): void {
   const site = sites.current?.name ?? ''
@@ -393,11 +395,11 @@ async function removeProfile(p: PortProfile): Promise<void> {
     <UiDialog v-model:open="syncOpen" wide :title="t('siteVlans.sync')">
       <div class="space-y-4">
         <label class="flex items-start gap-2 text-sm">
-          <input v-model="tagUplinks" type="checkbox" class="mt-0.5 accent-orange-600" />
+          <input v-model="tagUplinks" data-no-dirty type="checkbox" class="mt-0.5 accent-orange-600" />
           <span><span class="font-medium">{{ t('siteVlans.tagUplinks') }}</span><br /><span class="text-gray-500">{{ t('siteVlans.tagUplinksHint') }}</span></span>
         </label>
         <label class="flex items-start gap-2 text-sm">
-          <input v-model="deleteExtra" type="checkbox" class="mt-0.5 accent-red-600" />
+          <input v-model="deleteExtra" data-no-dirty type="checkbox" class="mt-0.5 accent-red-600" />
           <span><span class="font-medium">{{ t('siteVlans.deleteExtra') }}</span><br /><span class="text-gray-500">{{ t('siteVlans.deleteExtraHint') }}</span></span>
         </label>
         <div v-if="planning" class="flex justify-center py-6"><UiSpinner /></div>

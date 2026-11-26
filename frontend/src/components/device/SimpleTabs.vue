@@ -1,15 +1,16 @@
 <script setup lang="ts">
 /** The VLAN, MAC, neighbour and poll status tabs of a device: plain read-only tables. */
 import { MagnifyingGlassIcon } from '@heroicons/vue/20/solid'
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { DeviceVlan, FdbEntry, LldpNeighbor, PollState } from '@/api/client'
 import UiCsvButton from '@/components/ui/UiCsvButton.vue'
 import UiSortTh from '@/components/ui/UiSortTh.vue'
 import { useTableSort } from '@/composables/useTableSort'
 import { downloadCsv } from '@/utils/csv'
-import { formatDateTime } from '@/utils/format'
 import { vlanMatcher } from '@/utils/vlanFilter'
+import UiTime from '@/components/ui/UiTime.vue'
+import { useQueryParam } from '@/composables/useQueryState'
 
 const props = defineProps<{
   tab: 'vlans' | 'fdb' | 'lldp' | 'poll'
@@ -20,8 +21,8 @@ const props = defineProps<{
   /** for the name of the CSV file */
   deviceName?: string
 }>()
-const { t, locale } = useI18n()
-const search = ref('')
+const { t } = useI18n()
+const search = useQueryParam('s')
 
 watch(() => props.tab, () => (search.value = ''))
 
@@ -36,7 +37,7 @@ const { sort: vlanSort, sorted: vlanRows } = useTableSort(() => vlanFiltered.val
   name: (v) => v.name,
   untagged: (v) => v.untagged_ports,
   tagged: (v) => v.tagged_ports,
-})
+}, null, true, 'vsort')
 
 const fdbFiltered = computed(() => {
   const q = search.value.trim().toLowerCase()
@@ -48,7 +49,7 @@ const { sort: fdbSort, sorted: fdbRows } = useTableSort(() => fdbFiltered.value,
   vid: (e) => e.vid,
   port: (e) => e.port_name,
   ip: (e) => e.ip_addresses[0],
-})
+}, null, true, 'msort')
 
 const lldpFiltered = computed(() => {
   const q = search.value.trim().toLowerCase()
@@ -63,7 +64,7 @@ const { sort: lldpSort, sorted: lldpRows } = useTableSort(() => lldpFiltered.val
   remotePort: (n) => n.remote_port_description || n.remote_port,
   address: (n) => n.management_address,
   model: (n) => n.system_description,
-})
+}, null, true, 'nsort')
 
 function exportCsv(): void {
   const file = `${props.tab}-${props.deviceName ?? ''}`
@@ -190,8 +191,8 @@ const count = computed(() =>
         <tbody>
           <tr v-for="s in poll" :key="s.task">
             <td class="font-medium">{{ t(`poll.tasks.${s.task}`) }}</td>
-            <td class="whitespace-nowrap tabular-nums">{{ formatDateTime(s.last_success_at, locale) }}</td>
-            <td class="whitespace-nowrap tabular-nums">{{ formatDateTime(s.next_due_at, locale) }}</td>
+            <td class="whitespace-nowrap tabular-nums"><UiTime :value="s.last_success_at" /></td>
+            <td class="whitespace-nowrap tabular-nums"><UiTime :value="s.next_due_at" /></td>
             <td class="text-right tabular-nums">{{ s.last_duration_ms != null ? `${s.last_duration_ms} ms` : '—' }}</td>
             <td class="text-right tabular-nums" :class="{ 'text-red-600 dark:text-red-400': s.failures }">{{ s.failures }}</td>
             <td class="max-w-96 text-xs break-words text-red-600 dark:text-red-400">{{ s.last_error }}</td>

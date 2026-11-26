@@ -8,7 +8,14 @@ import UiSpinner from '@/components/ui/UiSpinner.vue'
 import { useNotify } from '@/composables/useNotify'
 import { vlanMatcher } from '@/utils/vlanFilter'
 
-const props = defineProps<{ deviceId: number; siteId: number; ports: Port[]; vlans: DeviceVlan[] }>()
+const props = defineProps<{
+  deviceId: number
+  siteId: number
+  ports: Port[]
+  vlans: DeviceVlan[]
+  /** all ports of the switch: VLANs can be copied from one of them */
+  allPorts?: Port[]
+}>()
 const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ applied: [] }>()
 
@@ -25,6 +32,8 @@ const profileId = ref<number | null>(null)
 /** Bind the ports to the chosen profile: later profile changes are applied to them. */
 const bind = ref(false)
 const description = ref('')
+/** several ports: set the same description on all of them */
+const setDescription = ref(false)
 const enabled = ref<Tri>('keep')
 const members = ref<Record<number, Member>>({})
 const untaggedTouched = ref(false)
@@ -36,6 +45,12 @@ const busy = ref(false)
 const failure = ref<string | null>(null)
 
 const single = computed(() => (props.ports.length === 1 ? props.ports[0] : null))
+
+/** The form as it was when the dialog opened: anything else is unsaved input. */
+const formState = (): string =>
+  JSON.stringify([profileId.value, bind.value, description.value, setDescription.value, enabled.value, members.value])
+const startState = ref('')
+const dirty = computed(() => open.value && formState() !== startState.value)
 
 /** Selected ports bound to a profile: VLANs and description only change through the profile. */
 const boundPorts = computed(() => props.ports.filter((p) => p.port_profile_id != null))
@@ -77,10 +92,12 @@ watch(open, async (isOpen) => {
   bind.value = profileId.value !== null
   enabled.value = 'keep'
   description.value = single.value?.description ?? ''
+  setDescription.value = false
   members.value = { ...initial.value }
   untaggedTouched.value = false
   filter.value = ''
   onlyAssigned.value = false
+  startState.value = formState()
   profiles.value = await api.get<PortProfile[]>(`/sites/${props.siteId}/port-profiles`).catch(() => [])
 }, { immediate: true })
 
@@ -89,12 +106,15 @@ watch(open, async (isOpen) => {
 watch(initial, (now) => {
   if (!open.value) return
   const missing = Object.keys(now).filter((vid) => !(vid in members.value))
-  if (missing.length) members.value = { ...Object.fromEntries(missing.map((vid) => [vid, now[Number(vid)]!])), ...members.value }
+  if (!missing.length) return
+  const wasDirty = dirty.value
+  members.value = { ...Object.fromEntries(missing.map((vid) => [vid, now[Number(vid)]!])), ...members.value }
+  if (!wasDirty) startState.value = formState()
 })
 
 // Any edit invalidates the preview.
 watch(
-  [profileId, bind, description, enabled, members],
+  [profileId, bind, description, setDescription, enabled, members],
   () => {
     plan.value = null
     failure.value = null
@@ -123,6 +143,28 @@ function set(vid: number, value: Member): void {
   }
   next[vid] = value
   members.value = next
+}
+
+/** Other ports to copy the VLANs from, with their VLANs as a hint. */
+const copySources = computed(() =>
+  (props.allPorts ?? [])
+    .filter((p) => !props.ports.some((own) => own.id === p.id) && (p.untagged_vlans.length || p.tagged_vlans.length))
+    .map((p) => ({
+      port: p,
+      label: `${p.name}  (U ${p.untagged_vlans[0] ?? '–'}${p.tagged_vlans.length ? ` / T ${p.tagged_vlans.join(',')}` : ''})`,
+    })),
+)
+
+/** Take over the VLANs of another port: same untagged VLAN, same tagged VLANs. */
+function copyFrom(event: Event): void {
+  const select = event.target as HTMLSelectElement
+  const source = props.allPorts?.find((p) => p.id === Number(select.value))
+  select.value = ''
+  if (!source) return
+  const next: Record<number, Member> = {}
+  for (const v of props.vlans) next[v.vid] = memberOf(source, v.vid)
+  members.value = next
+  untaggedTouched.value = true
 }
 
 function reset(vid: number): void {
@@ -154,6 +196,7 @@ function body(): Record<string, unknown> {
   if (profileId.value !== null) return { ...data, profile_id: profileId.value, bind: bind.value }
   if (boundPorts.value.length) return data // only on/off, the rest belongs to the profile
   if (single.value && description.value !== single.value.description) data.description = description.value
+  else if (!single.value && setDescription.value) data.description = description.value
   if (untaggedTouched.value) {
     if (untaggedNow.value) data.untagged = untaggedNow.value.vid
     else data.clear_untagged = true
@@ -215,7 +258,7 @@ const choiceClass: Record<(typeof CHOICES)[number], string> = {
 </script>
 
 <template>
-  <UiDialog v-model:open="open" wide :title="title">
+  <UiDialog v-model:open="open" wide :dirty="dirty" :title="title">
     <div class="space-y-5">
       <p v-if="!single" class="font-mono text-xs text-gray-500 dark:text-gray-400">{{ ports.map((p) => p.name).join(', ') }}</p>
 
@@ -257,6 +300,19 @@ const choiceClass: Record<(typeof CHOICES)[number], string> = {
           <label class="label" for="pe-desc">{{ t('ports.description') }}</label>
           <input id="pe-desc" v-model="description" class="input" maxlength="200" />
         </div>
+        <div v-else class="field">
+          <label class="flex items-center gap-2 text-sm font-medium">
+            <input v-model="setDescription" type="checkbox" class="accent-brand-600" /> {{ t('change.descriptionAll') }}
+          </label>
+          <input
+            v-if="setDescription"
+            v-model="description"
+            class="input"
+            maxlength="200"
+            :aria-label="t('ports.description')"
+            :placeholder="t('change.descriptionAllHint')"
+          />
+        </div>
 
         <section class="space-y-3">
           <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -274,9 +330,13 @@ const choiceClass: Record<(typeof CHOICES)[number], string> = {
           <div class="flex flex-wrap items-center gap-3">
             <div class="relative">
               <MagnifyingGlassIcon class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-gray-400" />
-              <input v-model="filter" class="input w-72 pl-8" :placeholder="t('vlans.search')" />
+              <input v-model="filter" data-no-dirty class="input w-72 pl-8" :placeholder="t('vlans.search')" />
             </div>
-            <label class="flex items-center gap-2 text-sm"><input v-model="onlyAssigned" type="checkbox" class="accent-brand-600" /> {{ t('change.onlyAssigned') }}</label>
+            <label class="flex items-center gap-2 text-sm"><input v-model="onlyAssigned" data-no-dirty type="checkbox" class="accent-brand-600" /> {{ t('change.onlyAssigned') }}</label>
+            <select v-if="copySources.length" class="input ml-auto w-auto max-w-64" :aria-label="t('change.copyFrom')" @change="copyFrom">
+              <option value="">{{ t('change.copyFrom') }}</option>
+              <option v-for="c in copySources" :key="c.port.id" :value="c.port.id">{{ c.label }}</option>
+            </select>
           </div>
 
           <ul class="max-h-80 divide-y divide-gray-100 overflow-y-auto rounded-lg border border-gray-200 dark:divide-white/5 dark:border-white/10">

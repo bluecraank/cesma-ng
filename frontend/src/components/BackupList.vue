@@ -11,6 +11,7 @@ import UiDialog from '@/components/ui/UiDialog.vue'
 import { useNotify } from '@/composables/useNotify'
 import { useAuthStore } from '@/stores/auth'
 import { formatDateTime } from '@/utils/format'
+import UiTime from '@/components/ui/UiTime.vue'
 
 const props = defineProps<{ backups: Backup[]; showDevice?: boolean }>()
 // Without a chosen column: newest first, as delivered.
@@ -20,7 +21,7 @@ const { sort, sorted } = useTableSort(() => props.backups, {
   status: (b) => (b.status === 'failed' ? 0 : b.changed ? 1 : 2),
   size: (b) => (b.status === 'ok' ? b.size : null),
   by: (b) => b.created_by,
-})
+}, null, true, 'bsort')
 const auth = useAuthStore()
 const { t, locale } = useI18n()
 const notify = useNotify()
@@ -92,7 +93,7 @@ function size(bytes: number): string {
       </thead>
       <tbody>
         <tr v-for="b in sorted" :key="b.id">
-          <td class="whitespace-nowrap tabular-nums">{{ formatDateTime(b.created_at, locale) }}</td>
+          <td class="whitespace-nowrap tabular-nums"><UiTime :value="b.created_at" /></td>
           <td v-if="showDevice">
             <RouterLink :to="{ name: 'device', params: { id: b.device_id }, query: { tab: 'backups' } }" class="link">{{ b.device_name }}</RouterLink>
           </td>

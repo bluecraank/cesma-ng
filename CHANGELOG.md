@@ -8,6 +8,30 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-26
+
+### Hinzugefügt
+
+- Die Suche (Strg+K oder `/`) springt auch zu Seiten: z. B. „ber“ und Enter öffnet die Berichte
+- Der Browser-Tab zeigt Seite und Standort, z. B. „Switches · Hauptstandort · cesma-ng“, so lassen sich mehrere offene Tabs unterscheiden
+- Die Bereiche der Seitenleiste lassen sich per Klick auf die Überschrift einklappen; der Browser merkt sich das, die aktuelle Seite bleibt sichtbar
+- Benachrichtigungen zeigen auch in der Seitenleiste die Zahl der offenen Meldungen
+- Die Seite eines Switches aktualisiert sich alle 30 Sekunden selbst, solange der Browser-Tab sichtbar ist. Neben „Aktualisieren“ lässt sich das anhalten; die Kopfzeile zeigt, wie alt die Daten sind
+- Mehrere Ports auf einmal: In der Auswahlleiste lassen sich die markierten Ports direkt aktivieren oder deaktivieren (mit Rückfrage und Warnung bei Uplinks). Im Bearbeiten-Dialog lässt sich für alle Ports dieselbe Beschreibung setzen
+- Port bearbeiten: „VLANs übernehmen von …“ übernimmt untagged und tagged VLANs eines anderen Ports dieses Switches
+- Dialoge fragen vor dem Schließen mit Esc, X oder Klick daneben, wenn Eingaben noch nicht gespeichert sind; auch Neuladen oder Schließen des Tabs fragt dann nach
+
+### Geändert
+
+- Zeitangaben in den Tabellen sind relativ, z. B. „vor 5 Min.“ oder „gestern“; ältere als eine Woche zeigen das Datum. Das genaue Datum steht im Tooltip. Betrifft Switch-Liste, Clients, Backups, Protokoll, Benachrichtigungen, Aufträge, Berichte, Konfig-Regeln, Port-Status und die Verwaltung
+- Suche, Filter und Sortierung stehen in der Adresse (z. B. `/vlans?q=10-20&sort=-name`): Sie bleiben beim Neuladen und bei „Zurück“ erhalten, und der Link zeigt anderen dieselbe Ansicht. Gilt für Switches, Switchports, Clients, VLANs und Portprofile, Konfig-Regeln, Protokoll, Benachrichtigungen, Backups und die Tabellen eines Switches
+- Ein Dialog schließt nicht mehr, wenn man in einem Feld Text markiert und die Maus außerhalb loslässt
+
+- Neuer Bereich „Überwachung“ in der Seitenleiste mit Benachrichtigungen, Konfig-Regeln, Berichten und Protokoll. Die Netzwerk-Seiten stehen darüber in der Reihenfolge Übersicht, Switches, Switchports, Clients, VLANs, Topologie, Backups
+- Der Menüpunkt bleibt auch auf Unterseiten markiert, z. B. „Switches“ auf der Seite eines Switches
+- Beim Wechsel auf eine andere Seite beginnt sie oben; „Zurück“ springt an die alte Stelle
+- Die Suche nennt Treffer „Switch“ statt „Gerät“
+
 ## [0.17.1] - 2026-11-26
 
 ### Behoben

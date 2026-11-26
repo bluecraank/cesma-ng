@@ -2,6 +2,10 @@ import type de from './de'
 
 const en: typeof de = {
   common: {
+    discardTitle: 'Discard changes?',
+    discardMessage: 'The input in this dialog has not been saved and is lost when closing.',
+    discard: 'Discard',
+    keepEditing: 'Keep editing',
     more: 'More',
     save: 'Save',
     cancel: 'Cancel',
@@ -23,6 +27,7 @@ const en: typeof de = {
     no: 'No',
   },
   nav: {
+    monitoring: 'Monitoring',
     switchports: 'Switch ports',
     compliance: 'Config rules',
     roles: 'Roles',
@@ -176,6 +181,9 @@ const en: typeof de = {
     managed: 'Managed',
   },
   poll: {
+    loaded: 'as of',
+    autoOn: 'Refreshes every 30 seconds – click to pause',
+    autoOff: 'Automatic refresh is paused – click to resume',
     title: 'Poll status',
     refresh: 'Refresh now',
     refreshed: 'Refresh requested',
@@ -217,10 +225,10 @@ const en: typeof de = {
     active: 'Active',
   },
   search: {
-    placeholder: 'Search… (devices, ports, clients, VLANs)',
+    placeholder: 'Search… (pages, switches, ports, clients, VLANs)',
     shortcut: 'Ctrl K',
     empty: 'No results',
-    kinds: { device: 'Device', port: 'Port', client: 'Client', vlan: 'VLAN' },
+    kinds: { page: 'Page', device: 'Switch', port: 'Port', client: 'Client', vlan: 'VLAN' },
   },
   macTypes: {
     title: 'MAC types',
@@ -238,6 +246,16 @@ const en: typeof de = {
     enabled: 'Enabled',
   },
   change: {
+    enable: 'Enable',
+    disable: 'Disable',
+    enableTitle: 'Enable port | Enable {n} ports',
+    disableTitle: 'Disable port | Disable {n} ports',
+    enableConfirm: 'Cesma switches {ports} on and saves the configuration.',
+    disableConfirm: 'Cesma switches {ports} off and saves the configuration.',
+    disableUplink: 'Careful, uplink: {ports}. Parts of the network or the switch itself may become unreachable.',
+    descriptionAll: 'Set the description on all ports',
+    descriptionAllHint: 'Leave empty to clear the description',
+    copyFrom: 'Copy VLANs from …',
     selected: '{n} port selected | {n} ports selected',
     shiftHint: 'Shift+click selects a range',
     clearSelection: 'Clear selection',

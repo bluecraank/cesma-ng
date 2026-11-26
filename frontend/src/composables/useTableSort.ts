@@ -1,4 +1,5 @@
 import { computed, reactive, type ComputedRef } from 'vue'
+import { useQuerySort } from '@/composables/useQueryState'
 
 export type SortValue = string | number | boolean | null | undefined
 
@@ -20,12 +21,14 @@ function compare(a: SortValue, b: SortValue): number {
 /**
  * Client-side sorting for a table. `columns` maps a column key to the value to sort by.
  * Rows without a value always end up at the bottom, whatever the direction.
+ * With ``query`` the sorting is kept in the URL under that name (?sort=-name).
  */
 export function useTableSort<T, K extends string>(
   rows: () => readonly T[],
   columns: Record<K, (row: T) => SortValue>,
   initial: NoInfer<K> | null = null,
   initialAsc = true,
+  query?: string,
 ): { sort: SortState<K>; sorted: ComputedRef<T[]> } {
   const sort = reactive({
     key: initial,
@@ -35,6 +38,7 @@ export function useTableSort<T, K extends string>(
       sort.key = key
     },
   }) as SortState<K>
+  if (query) useQuerySort(sort, Object.keys(columns) as K[], query)
 
   const sorted = computed(() => {
     const list = [...rows()]

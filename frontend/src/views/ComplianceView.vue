@@ -11,7 +11,8 @@ import { useConfirmDelete } from '@/composables/useConfirm'
 import { useNotify } from '@/composables/useNotify'
 import { useAuthStore } from '@/stores/auth'
 import { useSitesStore } from '@/stores/sites'
-import { formatDateTime } from '@/utils/format'
+import UiTime from '@/components/ui/UiTime.vue'
+import { useQueryFlag } from '@/composables/useQueryState'
 
 type Compliance = components['schemas']['ComplianceOut']
 type Rule = components['schemas']['ComplianceRuleOut']
@@ -26,7 +27,7 @@ const EXAMPLES = [
   { name: 'SNMP nicht "public"', mode: 'forbid', pattern: 'community "?public' },
 ] as const
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const notify = useNotify()
 const auth = useAuthStore()
 const sites = useSitesStore()
@@ -36,7 +37,7 @@ const data = ref<Compliance | null>(null)
 /** Disabled rules are not in the matrix; super administrators can switch them on again. */
 const disabledRules = ref<Rule[]>([])
 const loading = ref(false)
-const onlyFailing = ref(false)
+const onlyFailing = useQueryFlag('failing')
 const detail = ref<{ device: string; rule: Rule; result: Result } | null>(null)
 const detailOpen = ref(false)
 
@@ -164,7 +165,7 @@ watch(() => sites.currentId, load, { immediate: true })
                   <span v-else class="text-xs text-gray-400" :title="t('compliance.notApplicable')">n/a</span>
                 </td>
                 <td class="text-xs whitespace-nowrap text-gray-500 tabular-nums">
-                  {{ d.backup_at ? formatDateTime(d.backup_at, locale) : t('compliance.noBackupYet') }}
+                  <UiTime :value="d.backup_at" :empty="t('compliance.noBackupYet')" />
                 </td>
               </tr>
             </tbody>

@@ -7,15 +7,16 @@ import { api, type Notification } from '@/api/client'
 import { useNotify } from '@/composables/useNotify'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useSitesStore } from '@/stores/sites'
-import { formatDateTime } from '@/utils/format'
+import UiTime from '@/components/ui/UiTime.vue'
+import { useQueryFlag } from '@/composables/useQueryState'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const notify = useNotify()
 const sites = useSitesStore()
 const counter = useNotificationsStore()
 
 const items = ref<Notification[]>([])
-const showAll = ref(false)
+const showAll = useQueryFlag('all')
 
 const icons = { critical: XCircleIcon, warning: ExclamationTriangleIcon, info: InformationCircleIcon }
 const colors = {
@@ -69,7 +70,7 @@ watch([() => sites.currentId, showAll], load, { immediate: true })
         <div class="min-w-0 flex-1">
           <p class="text-sm font-medium text-gray-900 dark:text-white">{{ n.message }}</p>
           <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-            {{ formatDateTime(n.created_at, locale) }}
+            <UiTime :value="n.created_at" />
             <template v-if="n.device_id">
               ·
               <RouterLink :to="{ name: 'device', params: { id: n.device_id } }" class="link">{{ t('device.details') }}</RouterLink>

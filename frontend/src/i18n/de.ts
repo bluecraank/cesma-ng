@@ -1,5 +1,9 @@
 export default {
   common: {
+    discardTitle: 'Änderungen verwerfen?',
+    discardMessage: 'Die Eingaben in diesem Dialog sind noch nicht gespeichert und gehen beim Schließen verloren.',
+    discard: 'Verwerfen',
+    keepEditing: 'Weiter bearbeiten',
     more: 'Mehr',
     save: 'Speichern',
     cancel: 'Abbrechen',
@@ -21,6 +25,7 @@ export default {
     no: 'Nein',
   },
   nav: {
+    monitoring: 'Überwachung',
     switchports: 'Switchports',
     compliance: 'Konfig-Regeln',
     roles: 'Rollen',
@@ -174,6 +179,9 @@ export default {
     managed: 'Verwaltet',
   },
   poll: {
+    loaded: 'Stand',
+    autoOn: 'Aktualisiert sich alle 30 Sekunden – klicken zum Anhalten',
+    autoOff: 'Automatisches Aktualisieren ist angehalten – klicken zum Fortsetzen',
     title: 'Abfragestatus',
     refresh: 'Jetzt abfragen',
     refreshed: 'Abfrage angestoßen',
@@ -215,10 +223,10 @@ export default {
     active: 'Aktiv',
   },
   search: {
-    placeholder: 'Suchen… (Geräte, Ports, Clients, VLANs)',
+    placeholder: 'Suchen… (Seiten, Switches, Ports, Clients, VLANs)',
     shortcut: 'Strg K',
     empty: 'Keine Treffer',
-    kinds: { device: 'Gerät', port: 'Port', client: 'Client', vlan: 'VLAN' },
+    kinds: { page: 'Seite', device: 'Switch', port: 'Port', client: 'Client', vlan: 'VLAN' },
   },
   macTypes: {
     title: 'MAC-Typen',
@@ -236,6 +244,16 @@ export default {
     enabled: 'Aktiv',
   },
   change: {
+    enable: 'Aktivieren',
+    disable: 'Deaktivieren',
+    enableTitle: 'Port aktivieren | {n} Ports aktivieren',
+    disableTitle: 'Port deaktivieren | {n} Ports deaktivieren',
+    enableConfirm: 'Cesma schaltet {ports} auf dem Switch ein und speichert die Konfiguration.',
+    disableConfirm: 'Cesma schaltet {ports} auf dem Switch ab und speichert die Konfiguration.',
+    disableUplink: 'Achtung, Uplink: {ports}. Danach sind Teile des Netzes oder der Switch selbst womöglich nicht mehr erreichbar.',
+    descriptionAll: 'Beschreibung für alle setzen',
+    descriptionAllHint: 'Leer lassen, um die Beschreibung zu löschen',
+    copyFrom: 'VLANs übernehmen von …',
     selected: '{n} Port ausgewählt | {n} Ports ausgewählt',
     shiftHint: 'Shift+Klick wählt einen Bereich',
     clearSelection: 'Auswahl aufheben',

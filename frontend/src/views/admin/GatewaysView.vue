@@ -9,9 +9,9 @@ import UiDialog from '@/components/ui/UiDialog.vue'
 import UiToggle from '@/components/ui/UiToggle.vue'
 import { useConfirmDelete } from '@/composables/useConfirm'
 import { useNotify } from '@/composables/useNotify'
-import { formatDateTime } from '@/utils/format'
+import UiTime from '@/components/ui/UiTime.vue'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const notify = useNotify()
 const confirmDelete = useConfirmDelete()
 
@@ -94,7 +94,7 @@ onMounted(load)
             <td><span class="badge" :class="g.enabled ? 'badge-green' : 'badge-gray'">{{ g.enabled ? t('common.yes') : t('common.no') }}</span></td>
             <td class="text-right tabular-nums">{{ g.entries }}</td>
             <td class="whitespace-nowrap">
-              {{ formatDateTime(g.last_polled_at, locale) }}
+              <UiTime :value="g.last_polled_at" />
               <p v-if="g.last_error" class="text-xs text-red-600 dark:text-red-400">{{ g.last_error }}</p>
             </td>
             <td class="whitespace-nowrap">

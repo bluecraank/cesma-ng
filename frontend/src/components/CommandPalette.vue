@@ -10,12 +10,14 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { api, type SearchHit } from '@/api/client'
+import { useNavigation, type NavItem } from '@/composables/useNavigation'
 import { useSitesStore } from '@/stores/sites'
 
 const open = defineModel<boolean>('open', { required: true })
 const { t } = useI18n()
 const router = useRouter()
 const sites = useSitesStore()
+const { items: pages } = useNavigation()
 
 const query = ref('')
 const hits = ref<SearchHit[]>([])
@@ -45,7 +47,27 @@ watch(open, async (isOpen) => {
   input.value?.focus()
 })
 
-const grouped = computed(() => hits.value.map((hit, index) => ({ hit, index })))
+/** Pages of the menu whose name matches: "/ber" + Enter opens the reports. */
+const pageHits = computed<NavItem[]>(() => {
+  const q = query.value.trim().toLowerCase()
+  if (!q) return []
+  return pages.value.filter((page) => page.label.toLowerCase().includes(q)).slice(0, 4)
+})
+
+type Entry = { page: NavItem; hit?: undefined } | { hit: SearchHit; page?: undefined }
+const entries = computed<Entry[]>(() => [
+  ...pageHits.value.map((page) => ({ page })),
+  ...hits.value.map((hit) => ({ hit })),
+])
+const grouped = computed(() => entries.value.map((entry, index) => ({ entry, index })))
+watch(pageHits, () => (selected.value = 0))
+
+async function chooseEntry(entry: Entry): Promise<void> {
+  if (entry.page) {
+    open.value = false
+    await router.push(entry.page.to)
+  } else await choose(entry.hit)
+}
 
 async function choose(hit: SearchHit): Promise<void> {
   open.value = false
@@ -59,13 +81,13 @@ async function choose(hit: SearchHit): Promise<void> {
 
 function onKey(event: KeyboardEvent): void {
   if (event.key === 'ArrowDown') {
-    selected.value = Math.min(selected.value + 1, hits.value.length - 1)
+    selected.value = Math.min(selected.value + 1, entries.value.length - 1)
     event.preventDefault()
   } else if (event.key === 'ArrowUp') {
     selected.value = Math.max(selected.value - 1, 0)
     event.preventDefault()
-  } else if (event.key === 'Enter' && hits.value[selected.value]) {
-    void choose(hits.value[selected.value]!)
+  } else if (event.key === 'Enter' && entries.value[selected.value]) {
+    void chooseEntry(entries.value[selected.value]!)
   } else if (event.key === 'Escape') {
     open.value = false
   }
@@ -98,21 +120,28 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey))
             @keydown="onKey"
           />
         </div>
-        <ul v-if="hits.length" class="max-h-96 overflow-y-auto p-2">
+        <ul v-if="entries.length" class="max-h-96 overflow-y-auto p-2">
           <li
-            v-for="{ hit, index } in grouped"
+            v-for="{ entry, index } in grouped"
             :key="index"
             class="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2"
             :class="index === selected ? 'bg-brand-600 text-white' : 'text-gray-900 dark:text-gray-100'"
             @mouseenter="selected = index"
-            @click="choose(hit)"
+            @click="chooseEntry(entry)"
           >
-            <component :is="icons[hit.kind as keyof typeof icons]" class="size-5 shrink-0" :class="index === selected ? 'text-white' : 'text-gray-400'" />
-            <div class="min-w-0 flex-1">
-              <p class="truncate text-sm font-medium">{{ hit.title }}</p>
-              <p class="truncate text-xs" :class="index === selected ? 'text-brand-100' : 'text-gray-500'">{{ hit.subtitle }}</p>
-            </div>
-            <span class="text-xs" :class="index === selected ? 'text-brand-100' : 'text-gray-400'">{{ t(`search.kinds.${hit.kind}`) }}</span>
+            <template v-if="entry.page">
+              <component :is="entry.page.icon" class="size-5 shrink-0" :class="index === selected ? 'text-white' : 'text-gray-400'" />
+              <p class="min-w-0 flex-1 truncate text-sm font-medium">{{ entry.page.label }}</p>
+              <span class="text-xs" :class="index === selected ? 'text-brand-100' : 'text-gray-400'">{{ t('search.kinds.page') }}</span>
+            </template>
+            <template v-else>
+              <component :is="icons[entry.hit.kind as keyof typeof icons]" class="size-5 shrink-0" :class="index === selected ? 'text-white' : 'text-gray-400'" />
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-medium">{{ entry.hit.title }}</p>
+                <p class="truncate text-xs" :class="index === selected ? 'text-brand-100' : 'text-gray-500'">{{ entry.hit.subtitle }}</p>
+              </div>
+              <span class="text-xs" :class="index === selected ? 'text-brand-100' : 'text-gray-400'">{{ t(`search.kinds.${entry.hit.kind}`) }}</span>
+            </template>
           </li>
         </ul>
         <p v-else-if="query.trim().length >= 2" class="p-6 text-center text-sm text-gray-500">{{ t('search.empty') }}</p>

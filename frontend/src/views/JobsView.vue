@@ -4,9 +4,9 @@ import { onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api, type Job } from '@/api/client'
 import { useSitesStore } from '@/stores/sites'
-import { formatDateTime } from '@/utils/format'
+import UiTime from '@/components/ui/UiTime.vue'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const sites = useSitesStore()
 const jobs = ref<Job[]>([])
 const expanded = ref<number | null>(null)
@@ -47,7 +47,7 @@ onUnmounted(() => clearTimeout(timer))
                 <ChevronDownIcon v-if="expanded === j.id" class="size-4" />
                 <ChevronRightIcon v-else class="size-4" />
               </td>
-              <td class="whitespace-nowrap tabular-nums">{{ formatDateTime(j.created_at, locale) }}</td>
+              <td class="whitespace-nowrap tabular-nums"><UiTime :value="j.created_at" /></td>
               <td class="font-medium">{{ t(`jobs.kinds.${j.kind}`) }} <span class="text-xs text-gray-400">#{{ j.id }}</span></td>
               <td class="whitespace-nowrap">
                 <span class="badge" :class="badge[j.status as keyof typeof badge]">{{ t(`jobs.statuses.${j.status}`) }}</span>

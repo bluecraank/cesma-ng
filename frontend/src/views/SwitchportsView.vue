@@ -13,6 +13,7 @@ import { useSitesStore } from '@/stores/sites'
 import { formatDateTime } from '@/utils/format'
 import { panelLayout, portLabel } from '@/utils/switchPanel'
 import { deviceLabel } from '@/utils/vendor'
+import { useQueryFlag, useQueryNumber, useQueryParam } from '@/composables/useQueryState'
 
 type SwitchPorts = components['schemas']['SwitchPortsDeviceOut']
 type SwitchPort = components['schemas']['SwitchPortOut']
@@ -27,13 +28,13 @@ const auth = useAuthStore()
 
 const DAYS = [7, 30, 90, 180, 365]
 /** Live state: every port without link counts as free, regardless of how long it has been down. */
-const live = ref(false)
-const search = ref('')
-const place = ref('') // "" | "b:<id>" | "r:<id>"
-const minDays = ref(30)
-const includeDisabled = ref(false)
-const onlyPoe = ref(false)
-const onlyWithFree = ref(false)
+const live = useQueryFlag('live')
+const search = useQueryParam('q')
+const place = useQueryParam('place') // "" | "b:<id>" | "r:<id>"
+const minDays = useQueryNumber('days', 30, DAYS)
+const includeDisabled = useQueryFlag('disabled')
+const onlyPoe = useQueryFlag('poe')
+const onlyWithFree = useQueryFlag('withFree')
 const result = ref<SwitchPorts[]>([])
 const loading = ref(false)
 

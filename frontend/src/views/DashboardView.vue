@@ -8,7 +8,7 @@ import DeviceStatusTag from '@/components/DeviceStatusTag.vue'
 import { useNotify } from '@/composables/useNotify'
 import { useSitesStore } from '@/stores/sites'
 import { auditMessage } from '@/utils/auditMessage'
-import { formatDateTime } from '@/utils/format'
+import UiTime from '@/components/ui/UiTime.vue'
 
 const { t, locale } = useI18n()
 const notify = useNotify()
@@ -183,7 +183,7 @@ watch(() => sites.currentId, load, { immediate: true })
         </div>
         <ul class="divide-y divide-gray-100 dark:divide-white/5">
           <li v-for="e in events" :key="e.id" class="flex flex-col gap-0.5 px-5 py-3 sm:flex-row sm:items-center sm:gap-4">
-            <span class="w-36 shrink-0 text-xs text-gray-500 tabular-nums dark:text-gray-400">{{ formatDateTime(e.created_at, locale) }}</span>
+            <span class="w-36 shrink-0 text-xs text-gray-500 tabular-nums dark:text-gray-400"><UiTime :value="e.created_at" /></span>
             <span class="flex-1 text-sm">{{ auditMessage(e, locale) || e.action }}</span>
             <span class="text-xs text-gray-500 dark:text-gray-400">{{ e.actor_name }}</span>
           </li>

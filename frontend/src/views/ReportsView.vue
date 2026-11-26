@@ -5,7 +5,7 @@ import { api, ApiError } from '@/api/client'
 import UiSpinner from '@/components/ui/UiSpinner.vue'
 import { useNotify } from '@/composables/useNotify'
 import { useSitesStore } from '@/stores/sites'
-import { formatDateTime } from '@/utils/format'
+import UiTime from '@/components/ui/UiTime.vue'
 
 interface Report {
   firmware: { model: string; firmware: string; devices: string[] }[]
@@ -15,7 +15,7 @@ interface Report {
   backups: { device_id: number; device: string; last_backup: string | null }[]
 }
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const notify = useNotify()
 const sites = useSitesStore()
 const report = ref<Report | null>(null)
@@ -71,7 +71,7 @@ watch(() => sites.currentId, load, { immediate: true })
           <tbody>
             <tr v-for="b in report.backups" :key="b.device_id">
               <td><RouterLink :to="{ name: 'device', params: { id: b.device_id }, query: { tab: 'backups' } }" class="link">{{ b.device }}</RouterLink></td>
-              <td class="text-right text-xs text-red-600 dark:text-red-400">{{ b.last_backup ? formatDateTime(b.last_backup, locale) : t('reports.never') }}</td>
+              <td class="text-right text-xs text-red-600 dark:text-red-400"><UiTime :value="b.last_backup" :empty="t('reports.never')" /></td>
             </tr>
           </tbody>
         </table>

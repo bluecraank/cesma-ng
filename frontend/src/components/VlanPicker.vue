@@ -13,6 +13,12 @@ const { t } = useI18n()
 
 const query = ref('')
 const open = ref(false)
+const root = ref<HTMLElement | null>(null)
+
+/** Picking is done with buttons and keys: tell a surrounding dialog that something changed. */
+function changed(): void {
+  root.value?.dispatchEvent(new Event('change', { bubbles: true }))
+}
 const active = ref(0)
 
 const nameOf = (vid: number): string => props.vlans.find((v) => v.vid === vid)?.name ?? ''
@@ -30,10 +36,12 @@ function add(vids: number[]): void {
   model.value = [...new Set([...model.value, ...valid])].sort((a, b) => a - b)
   query.value = ''
   active.value = 0
+  changed()
 }
 
 function remove(vid: number): void {
   model.value = model.value.filter((v) => v !== vid)
+  changed()
 }
 
 /** "100-105" or "20" typed directly; otherwise the highlighted suggestion. */
@@ -68,14 +76,17 @@ function onKey(event: KeyboardEvent): void {
     if (commit()) event.preventDefault()
   } else if (event.key === 'Backspace' && !query.value && model.value.length) {
     model.value = model.value.slice(0, -1)
-  } else if (event.key === 'Escape') {
+    changed()
+  } else if (event.key === 'Escape' && open.value) {
+    // close the suggestions only, not the dialog around
+    event.preventDefault()
     open.value = false
   }
 }
 </script>
 
 <template>
-  <div class="relative">
+  <div ref="root" class="relative">
     <div
       class="input flex min-h-10 flex-wrap items-center gap-1.5 !py-1.5"
       @click="($refs.input as HTMLInputElement).focus()"

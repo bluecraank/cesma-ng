@@ -10,6 +10,12 @@ declare module 'vue-router' {
 
 export const router = createRouter({
   history: createWebHistory(),
+  // back/forward restores the position; new pages start at the top, tab switches (?tab=) stay put
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.path === from.path) return false
+    return { top: 0 }
+  },
   routes: [
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
     {
