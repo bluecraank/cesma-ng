@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** Front panel view of all switches: which ports are in use, which are free for a new connection. */
-import { ArrowTopRightOnSquareIcon, MagnifyingGlassIcon, MapPinIcon, PencilSquareIcon, SignalIcon } from '@heroicons/vue/20/solid'
+import { ArrowTopRightOnSquareIcon, BoltIcon, MagnifyingGlassIcon, MapPinIcon, PencilSquareIcon, SignalIcon } from '@heroicons/vue/20/solid'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/api/client'
@@ -135,9 +135,24 @@ const STYLE: Record<State, string> = {
   up: 'bg-sky-600 text-white hover:bg-sky-500',
   uplink: 'bg-violet-600 text-white hover:bg-violet-500',
   down: 'bg-gray-600 text-gray-200 hover:bg-gray-500',
-  disabled: 'bg-gray-800 text-gray-500 line-through ring-1 ring-red-500/60 ring-inset hover:bg-gray-700',
+  disabled: 'bg-gray-800 text-gray-500 line-through ring-2 ring-red-500 ring-inset hover:bg-gray-700',
 }
 const LEGEND: State[] = ['free', 'up', 'uplink', 'down', 'disabled']
+
+/**
+ * Live view: a link LED per port like on the switch. Every port blinks at its own pace,
+ * so the panel flickers like real traffic instead of all LEDs in step.
+ */
+/** PoE bolt: green while the port delivers power, red on a fault, faint when PoE is idle. */
+function poeClass(p: SwitchPort): string {
+  if (p.poe_status === 'delivering') return 'text-green-400'
+  if (p.poe_status === 'fault') return 'text-red-500'
+  return 'text-white/40'
+}
+
+function ledStyle(p: SwitchPort): Record<string, string> {
+  return { '--led-speed': `${700 + ((p.id * 37) % 900)}ms`, '--led-delay': `-${(p.id * 113) % 1500}ms` }
+}
 
 function speed(mbps: number | null): string {
   if (!mbps) return ''
@@ -289,7 +304,10 @@ function facts(p: SwitchPort): string[] {
         <span class="inline-block size-3.5 rounded-sm" :class="STYLE[s]" />
         {{ t(`switchports.legend.${s}`) }}
       </span>
-      <span class="flex items-center gap-1.5"><span class="inline-block size-1.5 rounded-full bg-amber-400" /> PoE</span>
+      <span class="flex items-center gap-1"><BoltIcon class="size-3.5 text-green-500" /> {{ t('switchports.legend.poeOn') }}</span>
+      <span class="flex items-center gap-1"><BoltIcon class="size-3.5 text-gray-400" /> {{ t('switchports.legend.poeOff') }}</span>
+      <span class="flex items-center gap-1"><BoltIcon class="size-3.5 text-red-500" /> {{ t('switchports.legend.poeFault') }}</span>
+      <span v-if="live" class="flex items-center gap-1.5"><span class="port-led static inline-block" /> {{ t('switchports.legend.link') }}</span>
     </div>
 
     <UiSpinner v-if="loading && !result.length" class="mx-auto" />
@@ -328,7 +346,8 @@ function facts(p: SwitchPort): string[] {
                     @blur="hover = null"
                   >
                     {{ portLabel(p.name) }}
-                    <span v-if="p.poe" class="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-amber-400" />
+                    <BoltIcon v-if="p.poe" class="absolute -top-0.5 -right-0.5 size-3 drop-shadow" :class="poeClass(p)" />
+                    <span v-if="live && p.oper_up" class="port-led" :style="ledStyle(p)" />
                   </RouterLink>
                   <span v-else class="h-6 w-6 2xl:h-7 2xl:w-8" />
                 </template>

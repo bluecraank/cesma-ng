@@ -10,7 +10,7 @@ import { useNotify } from '@/composables/useNotify'
 /** Order and grouping of the permissions in the matrix. */
 const GROUPS: { key: string; permissions: Permission[] }[] = [
   { key: 'devices', permissions: ['devices.manage', 'ports.edit', 'vlans.manage'] },
-  { key: 'backups', permissions: ['backups.run', 'backups.read', 'backups.restore'] },
+  { key: 'backups', permissions: ['backups.run', 'backups.read'] },
   { key: 'access', permissions: ['console', 'ssh_keys.push'] },
 ]
 

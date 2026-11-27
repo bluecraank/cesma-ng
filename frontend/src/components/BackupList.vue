@@ -1,12 +1,11 @@
 <script setup lang="ts">
 /** Backup table, used on the backups page (whole site) and on the device page. */
-import { ArrowDownTrayIcon, ArrowUturnLeftIcon, ArrowsRightLeftIcon } from '@heroicons/vue/20/solid'
+import { ArrowDownTrayIcon, ArrowsRightLeftIcon } from '@heroicons/vue/20/solid'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import UiSortTh from '@/components/ui/UiSortTh.vue'
 import { useTableSort } from '@/composables/useTableSort'
-import { api, type Backup, type Job } from '@/api/client'
-import { useJobWatcher } from '@/composables/useJobWatcher'
+import { api, type Backup } from '@/api/client'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import { useNotify } from '@/composables/useNotify'
 import { useAuthStore } from '@/stores/auth'
@@ -29,27 +28,6 @@ const notify = useNotify()
 const diffOpen = ref(false)
 const diffText = ref('')
 const diffTitle = ref('')
-const { watch: watchJob } = useJobWatcher()
-
-// Restoring overwrites the running configuration: confirm by typing the device name.
-const restoreOf = ref<Backup | null>(null)
-const restoreOpen = ref(false)
-const confirmName = ref('')
-
-function askRestore(backup: Backup): void {
-  restoreOf.value = backup
-  confirmName.value = ''
-  restoreOpen.value = true
-}
-
-async function restore(): Promise<void> {
-  const b = restoreOf.value
-  if (!b || confirmName.value !== b.device_name) return
-  const ok = await notify.run(async () => {
-    watchJob(await api.post<Job>('/jobs', { kind: 'restore', site_id: b.site_id, backup_id: b.id }))
-  }, t('backups.restoreStarted'))
-  if (ok) restoreOpen.value = false
-}
 
 function previousOf(backup: Backup): Backup | undefined {
   return props.backups.find((b) => b.device_id === backup.device_id && b.status === 'ok' && b.created_at < backup.created_at)
@@ -113,31 +91,12 @@ function size(bytes: number): string {
               <a :href="`/api/v1/backups/${b.id}/config`" class="btn-icon inline-flex" :title="t('backups.download')">
                 <ArrowDownTrayIcon class="size-4" />
               </a>
-              <button v-if="auth.can('backups.restore', b.site_id)" type="button" class="btn-icon hover:!text-orange-600" :title="t('backups.restore')" @click="askRestore(b)">
-                <ArrowUturnLeftIcon class="size-4" />
-              </button>
             </template>
           </td>
         </tr>
         <tr v-if="!backups.length"><td :colspan="showDevice ? 6 : 5" class="py-8 text-center text-gray-500">—</td></tr>
       </tbody>
     </table>
-
-    <UiDialog v-model:open="restoreOpen" :title="t('backups.restore')">
-      <form id="restore-form" class="space-y-4" @submit.prevent="restore">
-        <p class="rounded-md bg-orange-50 p-3 text-sm text-orange-800 dark:bg-orange-500/10 dark:text-orange-300">
-          {{ t('backups.restoreWarning', { device: restoreOf?.device_name }) }}
-        </p>
-        <div class="field">
-          <label class="label" for="restore-confirm">{{ t('backups.restoreConfirm', { device: restoreOf?.device_name }) }}</label>
-          <input id="restore-confirm" v-model="confirmName" class="input" autocomplete="off" />
-        </div>
-      </form>
-      <template #footer>
-        <button type="button" class="btn btn-secondary" @click="restoreOpen = false">{{ t('common.cancel') }}</button>
-        <button type="submit" form="restore-form" class="btn btn-danger" :disabled="confirmName !== restoreOf?.device_name">{{ t('backups.restore') }}</button>
-      </template>
-    </UiDialog>
 
     <UiDialog v-model:open="diffOpen" wide :title="diffTitle">
       <pre v-if="diffText" class="max-h-[60vh] overflow-auto rounded-md bg-gray-900 p-3 font-mono text-xs leading-relaxed"><span v-for="(line, i) in diffText.split('\n')" :key="i" :class="lineClass(line)">{{ line }}

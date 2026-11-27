@@ -381,6 +381,8 @@ class SearchHit(BaseModel):
     port_id: int | None = None
     site_id: int | None = None
     query: str | None = None  # for "client": the value to search in the clients view
+    vid: int | None = None  # for "vlan"
+    switches: int | None = None  # for "vlan": on how many switches of the site it exists
 
 
 class SearchResult(BaseModel):
@@ -610,6 +612,7 @@ class SwitchPortOut(BaseModel):
     untagged_vlans: list[int]
     tagged_count: int
     poe: bool
+    poe_status: str | None = None
     #: LLDP neighbour on this port ("name (port)"), e.g. another switch or an access point
     neighbor: str | None
     #: devices currently in the MAC table (the first few) and their total number

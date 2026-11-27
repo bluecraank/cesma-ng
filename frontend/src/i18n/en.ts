@@ -236,6 +236,7 @@ const en: typeof de = {
     placeholder: 'Search… (pages, switches, ports, clients, VLANs)',
     shortcut: 'Ctrl K',
     empty: 'No results',
+    onSwitches: 'on no switch | on 1 switch | on {n} switches',
     kinds: { page: 'Page', device: 'Switch', port: 'Port', client: 'Client', vlan: 'VLAN' },
   },
   macTypes: {
@@ -336,12 +337,9 @@ const en: typeof de = {
   backups: {
     title: 'Backups',
     now: 'Back up now',
+    nowDevice: 'Back up this switch',
     started: 'Backup started',
     download: 'Download',
-    restore: 'Restore',
-    restoreWarning: 'The running configuration of {device} is replaced by this backup. Supported for HP/Aruba 2530 and Aruba CX.',
-    restoreConfirm: 'Type the device name "{device}" to confirm',
-    restoreStarted: 'Restore started',
     diff: 'Compare',
     diffTitle: 'Differences',
     noDiff: 'No differences.',
@@ -351,6 +349,8 @@ const en: typeof de = {
     by: 'By',
   },
   tasks: {
+    showLog: 'Show log',
+    openJob: 'Open on the tasks page',
     title: 'Tasks',
     running: 'none running | {n} running | {n} running',
     waiting: 'none waiting | {n} waiting | {n} waiting',
@@ -610,7 +610,7 @@ const en: typeof de = {
     downSince: 'No link since',
     downSinceStart: 'No link since monitoring started',
     lastDevice: 'Last device',
-    legend: { free: 'Free', up: 'Link up', uplink: 'Uplink', down: 'No link', disabled: 'Disabled' },
+    legend: { poeOn: 'PoE delivering', poeOff: 'PoE idle', poeFault: 'PoE fault', link: 'Link (blinking)', free: 'Free', up: 'Link up', uplink: 'Uplink', down: 'No link', disabled: 'Disabled' },
   },
   compliance: {
     title: 'Configuration rules',

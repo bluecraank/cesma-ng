@@ -69,12 +69,21 @@ async function chooseEntry(entry: Entry): Promise<void> {
   } else await choose(entry.hit)
 }
 
+/** VLANs: description, site (when there are several) and on how many switches they exist. */
+function subtitle(hit: SearchHit): string {
+  if (hit.kind !== 'vlan') return hit.subtitle ?? ''
+  const site = sites.sites.length > 1 ? sites.sites.find((s) => s.id === hit.site_id)?.name : undefined
+  return [hit.subtitle, site, t('search.onSwitches', hit.switches ?? 0)].filter(Boolean).join(' · ')
+}
+
 async function choose(hit: SearchHit): Promise<void> {
   open.value = false
   // Switch to the site of the result so the target page shows it.
   if (hit.site_id && hit.site_id !== sites.currentId) sites.currentId = hit.site_id
   if (hit.kind === 'client') await router.push({ name: 'clients', query: { q: hit.query ?? hit.title } })
-  else if (hit.kind === 'vlan') await router.push({ name: 'device', params: { id: hit.device_id }, query: { tab: 'vlans' } })
+  // a VLAN of the site's list opens the VLAN page; one only found on switches opens a switch with it
+  else if (hit.kind === 'vlan' && hit.device_id) await router.push({ name: 'device', params: { id: hit.device_id }, query: { tab: 'vlans' } })
+  else if (hit.kind === 'vlan') await router.push({ name: 'vlans', query: { q: String(hit.vid ?? '') } })
   else if (hit.device_id)
     await router.push({ name: 'device', params: { id: hit.device_id }, query: { tab: 'ports', ...(hit.port_id ? { port: hit.port_id } : {}) } })
 }
@@ -138,7 +147,7 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKey))
               <component :is="icons[entry.hit.kind as keyof typeof icons]" class="size-5 shrink-0" :class="index === selected ? 'text-white' : 'text-gray-400'" />
               <div class="min-w-0 flex-1">
                 <p class="truncate text-sm font-medium">{{ entry.hit.title }}</p>
-                <p class="truncate text-xs" :class="index === selected ? 'text-brand-100' : 'text-gray-500'">{{ entry.hit.subtitle }}</p>
+                <p class="truncate text-xs" :class="index === selected ? 'text-brand-100' : 'text-gray-500'">{{ subtitle(entry.hit) }}</p>
               </div>
               <span class="text-xs" :class="index === selected ? 'text-brand-100' : 'text-gray-400'">{{ t(`search.kinds.${entry.hit.kind}`) }}</span>
             </template>

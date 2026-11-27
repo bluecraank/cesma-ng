@@ -523,3 +523,23 @@ async def test_quick_jobs_have_their_own_lane(alice: AsyncClient, app, settings:
         # one job at a time per switch
         assert await jobs.next_pending(db, quick=True, busy_devices={device_id}) is None
         assert await jobs.next_pending(db, quick=True, exclude_ids={change["id"]}) is None
+
+
+async def test_restore_is_not_possible(alice: AsyncClient, app, settings: Settings) -> None:  # type: ignore[no-untyped-def]
+    settings = await _simulated_app(app, settings)
+    device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
+    site_id = (await alice.get(f"/devices/{device_id}")).json()["site_id"]
+    r = await alice.post("/jobs", json={"kind": "restore", "site_id": site_id, "backup_id": 1})
+    assert r.status_code == 422
+
+
+async def test_backup_of_one_switch_names_it(alice: AsyncClient, app, settings: Settings) -> None:  # type: ignore[no-untyped-def]
+    settings = await _simulated_app(app, settings)
+    device_id = await _polled(alice, app, settings, "hp-2530-48g", "aruba_os_switch")
+    site_id = (await alice.get(f"/devices/{device_id}")).json()["site_id"]
+    job = (
+        await alice.post(
+            "/jobs", json={"kind": "backup", "site_id": site_id, "device_ids": [device_id]}
+        )
+    ).json()
+    assert (job["summary"], job["device_id"]) == ("hp-2530-48g", device_id)

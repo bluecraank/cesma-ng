@@ -175,6 +175,19 @@
     }
   }
 
+  /* Link LED of a port in the live view (Switchports): blinks like a switch with traffic */
+  .port-led {
+    @apply absolute bottom-0.5 left-0.5 size-1.5 rounded-full bg-green-400;
+    box-shadow: 0 0 4px rgb(74 222 128 / 0.9);
+    animation: port-led var(--led-speed, 900ms) steps(1, end) infinite;
+    animation-delay: var(--led-delay, 0ms);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .port-led {
+      animation: none;
+    }
+  }
+
   .menu-item {
     @apply flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm whitespace-nowrap text-gray-700 hover:bg-gray-50
       dark:text-gray-200 dark:hover:bg-white/5;
@@ -189,5 +202,31 @@
   }
   .link {
     @apply font-medium text-brand-600 hover:text-brand-500 dark:text-brand-400 dark:hover:text-brand-300;
+  }
+}
+
+/* irregular on/off like activity: mostly on, short dark gaps */
+@keyframes port-led {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  22% {
+    opacity: 0.15;
+  }
+  30% {
+    opacity: 1;
+  }
+  58% {
+    opacity: 0.2;
+  }
+  64% {
+    opacity: 1;
+  }
+  81% {
+    opacity: 0.15;
+  }
+  86% {
+    opacity: 1;
   }
 }

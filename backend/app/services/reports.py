@@ -1,22 +1,23 @@
 """Reports per site: firmware overview, free ports, PoE, port errors, backup status."""
 
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core.db import ensure_utc, utcnow
 from app.domain.switch import PoeStatus, PortKind
 from app.models import Backup, BackupStatus, Device, Port, PortCounterSample
 from app.services.access import require_site_access
 from app.services.context import Caller
-from app.services.port_stats import rates
 from app.services.uplinks import uplink_port_ids
 
 UNUSED_AFTER_DAYS = 30
 BACKUP_STALE_AFTER = timedelta(days=2)
+ERRORS_LIMIT = 50
 
 
 async def site_report(db: AsyncSession, caller: Caller, site_id: int) -> dict[str, Any]:
@@ -28,17 +29,30 @@ async def site_report(db: AsyncSession, caller: Caller, site_id: int) -> dict[st
     )
     ids = [d.id for d in devices]
     names = {d.id: d.name for d in devices}
+    # only the columns the reports read: whole Port objects would also load their VLANs
     ports = (
-        (await db.execute(select(Port).where(Port.device_id.in_(ids)))).scalars().all()
+        (
+            await db.execute(
+                select(
+                    Port.id,
+                    Port.device_id,
+                    Port.name,
+                    Port.kind,
+                    Port.oper_up,
+                    Port.last_change_at,
+                    Port.poe,
+                ).where(Port.device_id.in_(ids))
+            )
+        ).all()
         if ids
         else []
     )
-    uplinks = await uplink_port_ids(db)
+    uplinks = await uplink_port_ids(db, site_id=site_id)
     return {
         "firmware": _firmware(devices),
         "free_ports": _free_ports(ports, names, uplinks),
         "poe": _poe(ports, names),
-        "errors": await _errors(db, ports, names),
+        "errors": await _errors(db, site_id, names),
         "backups": await _backups(db, devices),
     }
 
@@ -95,43 +109,94 @@ def _poe(ports: Any, names: dict[int, str]) -> list[dict[str, Any]]:
     return sorted(per_device.values(), key=lambda e: e["device"])
 
 
-async def _errors(db: AsyncSession, ports: Any, names: dict[int, str]) -> list[dict[str, Any]]:
-    """Ports with interface errors in the last 24 hours."""
-    by_id = {p.id: p for p in ports}
-    if not by_id:
-        return []
-    since = utcnow() - timedelta(hours=24)
-    samples = (
-        (
-            await db.execute(
-                select(PortCounterSample)
-                .where(
-                    PortCounterSample.port_id.in_(list(by_id)),
-                    PortCounterSample.sampled_at >= since,
-                )
-                .order_by(PortCounterSample.port_id, PortCounterSample.sampled_at)
+async def _ports_with_error_growth(db: AsyncSession, site_id: int, since: datetime) -> list[int]:
+    """Ports whose error counters may have grown since ``since``: only those need a closer look.
+
+    Compares the first and the last sample of each port (two index lookups per port instead of
+    reading every sample). Counters only grow, so equal error counters at both ends mean no
+    errors - unless the switch restarted in between, which the octet counters going down show.
+    """
+    sample = PortCounterSample
+
+    def end(newest: bool) -> Any:
+        order = sample.sampled_at.desc() if newest else sample.sampled_at
+        return (
+            select(sample.id)
+            .where(sample.port_id == Port.id, sample.sampled_at >= since)
+            .order_by(order)
+            .limit(1)
+            .correlate(Port)
+            .scalar_subquery()
+        )
+
+    ends = (
+        select(Port.id.label("port_id"), end(False).label("first"), end(True).label("last"))
+        .join(Device, Device.id == Port.device_id)
+        .where(Device.site_id == site_id)
+        .subquery()
+    )
+    first, last = aliased(sample), aliased(sample)
+    rows = await db.execute(
+        select(ends.c.port_id)
+        .join(first, first.id == ends.c.first)
+        .join(last, last.id == ends.c.last)
+        .where(
+            or_(
+                last.in_errors + last.out_errors != first.in_errors + first.out_errors,
+                last.in_octets < first.in_octets,
+                last.out_octets < first.out_octets,
             )
         )
-        .scalars()
-        .all()
     )
-    grouped: dict[int, list[PortCounterSample]] = defaultdict(list)
-    for s in samples:
-        grouped[s.port_id].append(s)
-    result = []
-    for port_id, series in grouped.items():
-        errors = sum(p["in_errors"] + p["out_errors"] for p in rates(series))
-        if errors:
-            port = by_id[port_id]
-            result.append(
-                {
-                    "device_id": port.device_id,
-                    "device": names[port.device_id],
-                    "port": port.name,
-                    "errors": errors,
-                }
-            )
-    return sorted(result, key=lambda e: -e["errors"])[:50]
+    return list(rows.scalars())
+
+
+async def _errors(db: AsyncSession, site_id: int, names: dict[int, str]) -> list[dict[str, Any]]:
+    """Ports with interface errors in the last 24 hours.
+
+    Summed up in the database (the counters of a big site are millions of samples): the
+    growth between two samples of a port, skipping intervals with a counter reset.
+    """
+    sample = PortCounterSample
+    since = utcnow() - timedelta(hours=24)
+    candidates = await _ports_with_error_growth(db, site_id, since)
+    if not candidates:
+        return []
+
+    def growth(column: Any) -> Any:
+        previous = func.lag(column).over(partition_by=sample.port_id, order_by=sample.sampled_at)
+        return column - previous
+
+    deltas = (
+        select(
+            sample.port_id.label("port_id"),
+            growth(sample.in_errors).label("in_errors"),
+            growth(sample.out_errors).label("out_errors"),
+            growth(sample.in_octets).label("in_octets"),
+            growth(sample.out_octets).label("out_octets"),
+        )
+        .where(sample.port_id.in_(candidates), sample.sampled_at >= since)
+        .subquery()
+    )
+    errors = func.sum(deltas.c.in_errors + deltas.c.out_errors)
+    rows = await db.execute(
+        select(Port.device_id, Port.name, errors)
+        .join(Port, Port.id == deltas.c.port_id)
+        .where(
+            deltas.c.in_errors >= 0,  # NULL for the first sample of a port: no interval
+            deltas.c.out_errors >= 0,
+            deltas.c.in_octets >= 0,
+            deltas.c.out_octets >= 0,
+        )
+        .group_by(deltas.c.port_id, Port.device_id, Port.name)
+        .having(errors > 0)
+        .order_by(errors.desc(), deltas.c.port_id)
+        .limit(ERRORS_LIMIT)
+    )
+    return [
+        {"device_id": device_id, "device": names[device_id], "port": name, "errors": int(count)}
+        for device_id, name, count in rows
+    ]
 
 
 async def _backups(db: AsyncSession, devices: Any) -> list[dict[str, Any]]:

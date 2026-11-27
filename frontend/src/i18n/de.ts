@@ -234,6 +234,7 @@ export default {
     placeholder: 'Suchen… (Seiten, Switches, Ports, Clients, VLANs)',
     shortcut: 'Strg K',
     empty: 'Keine Treffer',
+    onSwitches: 'auf keinem Switch | auf 1 Switch | auf {n} Switches',
     kinds: { page: 'Seite', device: 'Switch', port: 'Port', client: 'Client', vlan: 'VLAN' },
   },
   macTypes: {
@@ -334,12 +335,9 @@ export default {
   backups: {
     title: 'Backups',
     now: 'Jetzt sichern',
+    nowDevice: 'Diesen Switch sichern',
     started: 'Backup gestartet',
     download: 'Herunterladen',
-    restore: 'Wiederherstellen',
-    restoreWarning: 'Die laufende Konfiguration von {device} wird durch dieses Backup ersetzt. Unterstützt für HP/Aruba 2530 und Aruba CX.',
-    restoreConfirm: 'Zur Bestätigung den Gerätenamen „{device}“ eingeben',
-    restoreStarted: 'Wiederherstellung gestartet',
     diff: 'Vergleichen',
     diffTitle: 'Unterschiede',
     noDiff: 'Keine Unterschiede.',
@@ -349,6 +347,8 @@ export default {
     by: 'Von',
   },
   tasks: {
+    showLog: 'Protokoll anzeigen',
+    openJob: 'Auf der Seite „Aufträge“ öffnen',
     title: 'Aufträge',
     running: 'keiner läuft | {n} läuft | {n} laufen',
     waiting: 'keiner wartet | {n} wartet | {n} warten',
@@ -608,7 +608,7 @@ export default {
     downSince: 'Ohne Link seit',
     downSinceStart: 'Ohne Link seit Beginn der Überwachung',
     lastDevice: 'Letztes Gerät',
-    legend: { free: 'Frei', up: 'Link aktiv', uplink: 'Uplink', down: 'Kein Link', disabled: 'Deaktiviert' },
+    legend: { poeOn: 'PoE liefert Strom', poeOff: 'PoE ohne Last', poeFault: 'PoE-Fehler', link: 'Link (blinkt)', free: 'Frei', up: 'Link aktiv', uplink: 'Uplink', down: 'Kein Link', disabled: 'Deaktiviert' },
   },
   compliance: {
     title: 'Konfigurationsregeln',

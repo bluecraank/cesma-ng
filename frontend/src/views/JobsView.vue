@@ -18,12 +18,18 @@ const badge = { pending: 'badge-gray', running: 'badge-blue', done: 'badge-green
 
 async function load(): Promise<void> {
   clearTimeout(timer)
-  jobs.value = await api.get<Job[]>('/jobs', { site_id: sites.currentId }).catch(() => jobs.value)
+  const list = await api.get<Job[]>('/jobs', { site_id: sites.currentId }).catch(() => jobs.value)
+  // a job linked from the task list may belong to another site or be older: show it on top
+  if (expanded.value && !list.some((j) => j.id === expanded.value)) {
+    const linked = await api.get<Job>(`/jobs/${expanded.value}`).catch(() => null)
+    if (linked) list.unshift(linked)
+  }
+  jobs.value = list
   // refresh while something is running
   if (jobs.value.some((j) => j.status === 'pending' || j.status === 'running')) timer = setTimeout(load, 2000)
 }
 
-watch(() => sites.currentId, load, { immediate: true })
+watch([() => sites.currentId, expanded], load, { immediate: true })
 onUnmounted(() => clearTimeout(timer))
 </script>
 

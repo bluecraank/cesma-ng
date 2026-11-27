@@ -205,6 +205,14 @@ def test_arubaos_render_membership_changes() -> None:
     assert w.render([SetPortDescription("5", "AP")]) == ['PUT /ports/5 {"name": "AP"}']
 
 
+def test_arubaos_rename_vlan_sends_its_id() -> None:
+    """Without vlan_id in the body the switch answers HTTP 400 "vlan_id is missing"."""
+    w = ArubaOsRestWriter("sw", CREDS)
+    assert w.render([RenameVlan(102, "Drucker")]) == [
+        'PUT /vlans/102 {"vlan_id": 102, "name": "Drucker"}'
+    ]
+
+
 async def test_arubaos_apply_logs_in_saves_and_logs_out() -> None:
     http = FakeHttp(
         {

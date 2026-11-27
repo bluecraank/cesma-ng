@@ -7888,6 +7888,28 @@
               }
             ],
             "title": "Query"
+          },
+          "vid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vid"
+          },
+          "switches": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Switches"
           }
         },
         "type": "object",
@@ -8314,6 +8336,17 @@
           "poe": {
             "type": "boolean",
             "title": "Poe"
+          },
+          "poe_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Poe Status"
           },
           "neighbor": {
             "anyOf": [

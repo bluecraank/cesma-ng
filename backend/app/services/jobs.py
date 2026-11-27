@@ -12,7 +12,6 @@ from app.core.db import utcnow
 from app.core.errors import DeviceError, ForbiddenError, NotFoundError, ValidationFailedError
 from app.drivers.writers import WriteError
 from app.models import (
-    AuditLevel,
     BackupStatus,
     Device,
     DeviceStatus,
@@ -50,7 +49,6 @@ JOB_KINDS: dict[str, Permission] = {
     "backup": Permission.BACKUPS_RUN,
     "ssh_keys": Permission.SSH_KEYS_PUSH,
     "discover": Permission.DEVICES_MANAGE,
-    "restore": Permission.BACKUPS_RESTORE,
     # whoever may change a port profile rolls it out to the ports bound to it
     "port_profile": Permission.VLANS_MANAGE,
     "port_change": Permission.PORTS_EDIT,
@@ -61,6 +59,18 @@ JOB_KINDS: dict[str, Permission] = {
 #: so a port change does not wait for the nightly backup of 300 switches
 QUICK_KINDS = frozenset({"port_change", "rename"})
 SUMMARY_LENGTH = 255
+
+
+#: failed switches named in the job's error (the log has all of them, with the reason)
+FAILED_NAMES = 10
+
+
+def _failure(failed: list[str], total: int) -> WriteError:
+    """``3 of 29 switch(es) failed: sw01, sw07, sw12`` - visible without opening the log."""
+    names = ", ".join(failed[:FAILED_NAMES])
+    if len(failed) > FAILED_NAMES:
+        names += f" (+{len(failed) - FAILED_NAMES} more)"
+    return WriteError(f"{len(failed)} of {total} switch(es) failed: {names}")
 
 
 def _clip(text: str) -> str:
@@ -90,6 +100,13 @@ async def enqueue(
                 f"At least {MIN_SSH_KEYS} SSH keys are required, so a single wrong key cannot "
                 "lock you out"
             )
+    if not summary and (ids := payload.get("device_ids")):
+        names = await db.scalars(
+            select(Device.name).where(Device.id.in_(ids)).order_by(Device.name)
+        )
+        summary = ", ".join(names)
+        if len(ids) == 1:
+            device_id = device_id or ids[0]
     job = Job(
         kind=kind,
         site_id=site_id,
@@ -264,7 +281,7 @@ async def _run_vlan_sync(ctx: JobContext) -> None:
         delete_extra=bool(ctx.job.payload.get("delete_extra")),
         tag_uplinks=bool(ctx.job.payload.get("tag_uplinks")),
     )
-    failures = 0
+    failed: list[str] = []
     for index, plan in enumerate(plans, 1):
         progress = int(index / max(len(plans), 1) * 100)
         if plan.empty:
@@ -288,22 +305,26 @@ async def _run_vlan_sync(ctx: JobContext) -> None:
             await polling.request_poll(ctx.db, device.id)
             await ctx.say(f"{device.name}: {len(plan.operations)} change(s) applied", progress)
         except (WriteError, TimeoutError) as exc:
-            failures += 1
-            await ctx.say(f"{device.name}: FAILED - {exc}", progress)
-    if failures:
-        raise WriteError(f"{failures} of {len(plans)} switch(es) failed, see log")
+            failed.append(device.name)
+            await ctx.say(
+                f"{device.name}: FAILED - {port_config.describe_failure(exc, APPLY_TIMEOUT)}",
+                progress,
+            )
+    if failed:
+        raise _failure(failed, len(plans))
 
 
 async def _run_backup(ctx: JobContext) -> None:
     devices = await _devices(ctx)
-    failed = 0
+    failed: list[str] = []
     for index, device in enumerate(devices, 1):
         backup = await backups.run_backup(ctx.db, ctx.runtime, device, ctx.caller.actor)
         state = "ok" if backup.status is BackupStatus.OK else f"FAILED - {backup.error}"
-        failed += backup.status is not BackupStatus.OK
+        if backup.status is not BackupStatus.OK:
+            failed.append(device.name)
         await ctx.say(f"{device.name}: {state}", int(index / max(len(devices), 1) * 100))
     if failed:
-        raise WriteError(f"{failed} backup(s) failed, see log")
+        raise _failure(failed, len(devices))
 
 
 async def _run_ssh_keys(ctx: JobContext) -> None:
@@ -313,7 +334,7 @@ async def _run_ssh_keys(ctx: JobContext) -> None:
     if len(keys) < MIN_SSH_KEYS:
         raise WriteError(f"At least {MIN_SSH_KEYS} SSH keys are required")
     devices = await _devices(ctx)
-    failed = 0
+    failed: list[str] = []
     for index, device in enumerate(devices, 1):
         progress = int(index / max(len(devices), 1) * 100)
         writer = await device_writer(ctx.db, ctx.runtime, device)
@@ -342,10 +363,13 @@ async def _run_ssh_keys(ctx: JobContext) -> None:
             )
             await ctx.say(f"{device.name}: {uploaded} key(s) uploaded{note}", progress)
         except (WriteError, TimeoutError) as exc:
-            failed += 1
-            await ctx.say(f"{device.name}: FAILED - {exc}", progress)
+            failed.append(device.name)
+            await ctx.say(
+                f"{device.name}: FAILED - {port_config.describe_failure(exc, APPLY_TIMEOUT)}",
+                progress,
+            )
     if failed:
-        raise WriteError(f"{failed} switch(es) failed, see log")
+        raise _failure(failed, len(devices))
 
 
 async def _run_discover(ctx: JobContext) -> None:
@@ -356,30 +380,6 @@ async def _run_discover(ctx: JobContext) -> None:
         ctx.db, ctx.runtime, cidr, ctx.job.site_id, ctx.job.payload.get("credential_profile_id")
     )
     await ctx.say(f"{found} new switch(es) found", 100)
-
-
-async def _run_restore(ctx: JobContext) -> None:
-    backup_id = int(ctx.job.payload.get("backup_id") or 0)
-    backup, device, config = await backups.backup_config(ctx.db, ctx.caller, ctx.runtime, backup_id)
-    if device.site_id != ctx.job.site_id:
-        raise ForbiddenError("Backup belongs to another site")
-    writer = await device_writer(ctx.db, ctx.runtime, device)
-    if not writer.supports_restore:
-        raise WriteError(f"Restore is not supported for {device.name}")
-    await ctx.say(f"{device.name}: restoring backup of {backup.created_at:%Y-%m-%d %H:%M} ...", 10)
-    async with asyncio.timeout(APPLY_TIMEOUT + 60):
-        await writer.restore(config)
-    await audit.record(
-        ctx.db,
-        ctx.caller.actor,
-        "backup.restore",
-        f"{device.name}: backup of {backup.created_at:%Y-%m-%d %H:%M} restored",
-        level=AuditLevel.WARNING,
-        site_id=device.site_id,
-        device_id=device.id,
-    )
-    await polling.request_poll(ctx.db, device.id)
-    await ctx.say(f"{device.name}: restored", 100)
 
 
 async def _run_port_profile(ctx: JobContext) -> None:
@@ -399,7 +399,7 @@ async def _run_port_profile(ctx: JobContext) -> None:
     for device_id, port_id in rows:
         by_device.setdefault(device_id, []).append(port_id)
     await ctx.say(f"Port profile {profile.name}: {sum(map(len, by_device.values()))} port(s)")
-    failed = 0
+    failed: list[str] = []
     for index, (device_id, port_ids) in enumerate(sorted(by_device.items()), 1):
         progress = int(index / len(by_device) * 100)
         device = await ctx.db.get(Device, device_id)
@@ -418,10 +418,10 @@ async def _run_port_profile(ctx: JobContext) -> None:
             done = "nothing to do" if plan.empty else f"{len(plan.operations)} change(s) applied"
             await ctx.say(f"{name}: {done}", progress)
         except DeviceError as exc:
-            failed += 1
+            failed.append(name)
             await ctx.say(f"{name}: FAILED - {exc}", progress)
     if failed:
-        raise WriteError(f"{failed} of {len(by_device)} switch(es) failed, see log")
+        raise _failure(failed, len(by_device))
 
 
 async def _job_device(ctx: JobContext) -> Device:
@@ -462,7 +462,6 @@ RUNNERS: dict[str, Callable[[JobContext], Awaitable[None]]] = {
     "backup": _run_backup,
     "ssh_keys": _run_ssh_keys,
     "discover": _run_discover,
-    "restore": _run_restore,
     "port_profile": _run_port_profile,
     "port_change": _run_port_change,
     "rename": _run_rename,

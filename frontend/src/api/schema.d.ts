@@ -2379,6 +2379,10 @@ export interface components {
             site_id?: number | null;
             /** Query */
             query?: string | null;
+            /** Vid */
+            vid?: number | null;
+            /** Switches */
+            switches?: number | null;
         };
         /** SearchResult */
         SearchResult: {
@@ -2558,6 +2562,8 @@ export interface components {
             tagged_count: number;
             /** Poe */
             poe: boolean;
+            /** Poe Status */
+            poe_status?: string | null;
             /** Neighbor */
             neighbor: string | null;
             /** Connected */

@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.switch import PortKind
-from app.models import DeviceVlan, LldpNeighbor, Port, PortVlan
+from app.models import Device, DeviceVlan, LldpNeighbor, Port, PortVlan
 
 #: a port tagged in at least this share of the switch's VLANs is treated as uplink/trunk
 UPLINK_VLAN_SHARE = 0.5
@@ -23,8 +23,10 @@ def is_uplink(kind: PortKind, tagged_count: int, device_vlan_count: int, to_swit
     return tagged_count >= max(UPLINK_MIN_VLANS, device_vlan_count * UPLINK_VLAN_SHARE)
 
 
-async def uplink_port_ids(db: AsyncSession, device_id: int | None = None) -> set[int]:
-    """Ids of all uplink ports (of one device or of all devices)."""
+async def uplink_port_ids(
+    db: AsyncSession, device_id: int | None = None, *, site_id: int | None = None
+) -> set[int]:
+    """Ids of all uplink ports (of one device, of one site or of all devices)."""
     ports = select(Port.id, Port.device_id, Port.kind)
     tagged = (
         select(PortVlan.port_id, func.count()).where(PortVlan.tagged).group_by(PortVlan.port_id)
@@ -35,6 +37,13 @@ async def uplink_port_ids(db: AsyncSession, device_id: int | None = None) -> set
         ports = ports.where(Port.device_id == device_id)
         vlans = vlans.where(DeviceVlan.device_id == device_id)
         to_switch = to_switch.where(LldpNeighbor.device_id == device_id)
+    if site_id is not None:
+        devices = select(Device.id).where(Device.site_id == site_id)
+        site_ports = select(Port.id).where(Port.device_id.in_(devices))
+        ports = ports.where(Port.device_id.in_(devices))
+        tagged = tagged.where(PortVlan.port_id.in_(site_ports))
+        vlans = vlans.where(DeviceVlan.device_id.in_(devices))
+        to_switch = to_switch.where(LldpNeighbor.device_id.in_(devices))
 
     tagged_counts = Counter({pid: n for pid, n in (await db.execute(tagged)).tuples()})
     vlan_counts = {did: n for did, n in (await db.execute(vlans)).tuples()}

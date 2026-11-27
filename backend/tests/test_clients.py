@@ -137,7 +137,19 @@ async def test_global_search_finds_devices_and_vlans(
     hits = (await alice.get("/search", params={"q": "dell-os"})).json()["hits"]
     assert hits[0]["kind"] == "device" and hits[0]["title"] == "dell-os10"
     vlan_hits = (await alice.get("/search", params={"q": "120"})).json()["hits"]
-    assert any(h["kind"] == "vlan" for h in vlan_hits)
+    # a number: the VLAN first, once per site (not once per switch)
+    assert vlan_hits[0]["kind"] == "vlan" and vlan_hits[0]["vid"] == 120
+    assert vlan_hits[0]["switches"] == 1
+    assert [h["vid"] for h in vlan_hits if h["kind"] == "vlan"].count(120) == 1
+
+    # by name, also VLANs of the site's list that are on no switch yet
+    site_id = vlan_hits[0]["site_id"]
+    await alice.post(
+        f"/sites/{site_id}/vlans", json={"vid": 3999, "name": "Drucker", "description": "EG"}
+    )
+    [hit] = [h for h in (await alice.get("/search", params={"q": "druck"})).json()["hits"]]
+    assert (hit["kind"], hit["title"], hit["subtitle"]) == ("vlan", "VLAN 3999 Drucker", "EG")
+    assert hit["switches"] == 0
 
 
 async def test_mac_types_need_valid_prefix(alice: AsyncClient, bob: AsyncClient) -> None:

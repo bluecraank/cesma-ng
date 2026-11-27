@@ -441,7 +441,8 @@ class ArubaOsRestWriter(RestWriter):
                 case CreateVlan(vid, name):
                     result.append(RestCall("POST", "/vlans", {"vlan_id": vid, "name": name}))
                 case RenameVlan(vid, name):
-                    result.append(RestCall("PUT", f"/vlans/{vid}", {"name": name}))
+                    # the switch wants the id in the body too ("vlan_id is missing", HTTP 400)
+                    result.append(RestCall("PUT", f"/vlans/{vid}", {"vlan_id": vid, "name": name}))
                 case DeleteVlan(vid):
                     result.append(RestCall("DELETE", f"/vlans/{vid}"))
                 case SetHostname(name):

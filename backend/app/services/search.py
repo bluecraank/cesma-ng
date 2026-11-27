@@ -2,10 +2,10 @@
 
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Device, DeviceVlan, Port
+from app.models import Device, DeviceVlan, Port, SiteVlan
 from app.services.access import visible_site_ids
 from app.services.clients import ClientFilter, search_clients
 from app.services.context import Caller
@@ -78,22 +78,70 @@ async def search(db: AsyncSession, caller: Caller, query: str) -> list[dict[str,
             }
         )
 
-    if q.isdigit():
-        vlans = (
-            select(DeviceVlan, Device.name, Device.site_id)
-            .join(Device, Device.id == DeviceVlan.device_id)
-            .where(DeviceVlan.vid == int(q))
+    vlans = await _vlans(db, q, sites)
+    # a plain number is most likely a VLAN: show those first
+    return vlans + hits if q.isdigit() else hits + vlans
+
+
+async def _vlans(db: AsyncSession, q: str, sites: set[int] | None) -> list[dict[str, Any]]:
+    """One hit per VLAN and site, by number, name or description.
+
+    The site's VLAN list (page "VLANs") and VLANs only found on its switches, with the
+    number of switches that have them.
+    """
+    like = f"%{q}%"
+    number = int(q) if q.isdigit() else None
+    found: dict[tuple[int, int], dict[str, Any]] = {}
+
+    wanted = select(SiteVlan).where(
+        or_(
+            SiteVlan.vid == number if number is not None else false(),
+            SiteVlan.name.ilike(like),
+            SiteVlan.description.ilike(like),
         )
-        if sites is not None:
-            vlans = vlans.where(Device.site_id.in_(sites))
-        for vlan, device_name, site_id in (await db.execute(vlans.limit(PER_KIND))).tuples():
-            hits.append(
-                {
-                    "kind": "vlan",
-                    "title": f"VLAN {vlan.vid} {vlan.name}",
-                    "subtitle": device_name,
-                    "device_id": vlan.device_id,
-                    "site_id": site_id,
-                }
+    )
+    if sites is not None:
+        wanted = wanted.where(SiteVlan.site_id.in_(sites))
+    for v in (await db.execute(wanted.order_by(SiteVlan.vid).limit(PER_KIND))).scalars():
+        found[(v.site_id, v.vid)] = _vlan_hit(v.site_id, v.vid, v.name, v.description)
+
+    on_switches = (
+        select(
+            Device.site_id,
+            DeviceVlan.vid,
+            func.max(DeviceVlan.name),
+            func.count(),
+            func.min(DeviceVlan.device_id),
+        )
+        .join(Device, Device.id == DeviceVlan.device_id)
+        .where(
+            or_(
+                DeviceVlan.vid == number if number is not None else false(),
+                DeviceVlan.name.ilike(like),
             )
-    return hits
+        )
+        .group_by(Device.site_id, DeviceVlan.vid)
+        .order_by(DeviceVlan.vid)
+        .limit(PER_KIND)
+    )
+    if sites is not None:
+        on_switches = on_switches.where(Device.site_id.in_(sites))
+    for site_id, vid, name, count, device_id in (await db.execute(on_switches)).tuples():
+        hit = found.get((site_id, vid))
+        if hit is None:  # not in the site's list: the result opens a switch that has it
+            hit = found[(site_id, vid)] = _vlan_hit(site_id, vid, name or "", "")
+            hit["device_id"] = device_id
+        hit["switches"] = count
+    hits = sorted(found.values(), key=lambda h: (h["vid"], h["site_id"]))
+    return hits[:PER_KIND]
+
+
+def _vlan_hit(site_id: int, vid: int, name: str, description: str) -> dict[str, Any]:
+    return {
+        "kind": "vlan",
+        "title": f"VLAN {vid} {name}".strip(),
+        "subtitle": description,
+        "site_id": site_id,
+        "vid": vid,
+        "switches": 0,
+    }

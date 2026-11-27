@@ -8,6 +8,27 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+### Hinzugefügt
+
+- Switch-Seite, Reiter „Backups“: „Diesen Switch sichern“ startet ein Backup nur für diesen Switch. In der Auftragsleiste steht bei Backups einzelner Switches jetzt deren Name
+
+### Geändert
+
+- Ladekreise: Der bewegte Teil läuft jetzt genau auf dem grauen Ring statt weiter innen
+- Switchports, Live-Ansicht: Jeder Port mit Link hat wie am echten Switch eine grüne LED, die blinkt – jeder Port in seinem eigenen Takt. Ports ohne Link haben keine LED. Deaktivierte Ports sind deutlich rot umrandet (auch außerhalb der Live-Ansicht). Wer im Betriebssystem „Bewegung reduzieren“ eingestellt hat, sieht die LED ruhig leuchten
+- Switchports: PoE wird je Port als Blitz angezeigt statt als Punkt – grün, wenn der Port Strom liefert, rot bei einem PoE-Fehler, blass bei PoE ohne Last
+
+### Behoben
+
+- Suche (Strg+K) findet VLANs jetzt auch nach Name und Beschreibung, nicht nur nach Nummer, und auch VLANs aus der VLAN-Liste des Standorts, die noch auf keinem Switch liegen. Jedes VLAN erscheint einmal pro Standort mit der Zahl der Switches, auf denen es liegt, statt einmal je Switch. Bei einer reinen Zahl stehen die VLANs oben. Ein Treffer öffnet die Seite „VLANs“ gefiltert auf dieses VLAN; liegt es nur auf Switches und nicht in der Liste, öffnet er einen Switch mit diesem VLAN
+- VLAN-Abgleich auf HP/Aruba-Switches (ArubaOS-Switch, z. B. 2530): Das Umbenennen eines vorhandenen VLANs scheiterte mit „HTTP 400 vlan_id is missing“, weil der Switch die VLAN-ID auch im Inhalt der Anfrage erwartet. Damit brach der Abgleich auf diesen Switches beim ersten umzubenennenden VLAN ab
+- Fehlgeschlagene Aufträge: Das Protokoll mit dem Grund je Switch war aus der Auftragsleiste nicht erreichbar. Ein Klick auf einen Auftrag klappt jetzt sein Protokoll auf, fehlgeschlagene Switches sind rot markiert. Die Fehlermeldung nennt die betroffenen Switches direkt („20 of 29 switch(es) failed: sw01, sw07, …“) statt nur „see log“, und eine Zeitüberschreitung steht als „no answer from the switch within … s“ im Protokoll statt als leere Meldung. Der Link „Auf der Seite ‚Aufträge‘ öffnen“ zeigt den Auftrag auch dann, wenn er zu einem anderen Standort gehört
+- Berichte laden auch an großen Standorten schnell. Für „Port-Fehler“ wurden bisher alle Zählerstände der letzten 24 Stunden geladen und einzeln verrechnet; jetzt rechnet die Datenbank, und nur Ports, deren Fehlerzähler sich überhaupt verändert hat, werden genau ausgewertet. Bei 120 Switches mit 6.400 Ports sinkt die Ladezeit von 17 Sekunden auf etwa eine Sekunde, bei wenigen fehlerhaften Ports auf ein Zehntel davon
+
+### Entfernt
+
+- Backups wiederherstellen: Der Knopf in den Backup-Listen ist weg, und auch über die API lässt sich kein Backup mehr auf einen Switch zurückspielen. Herunterladen und Vergleichen bleiben
+
 ## [0.20.0] - 2026-11-26
 
 ### Hinzugefügt

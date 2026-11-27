@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowPathIcon, ChevronLeftIcon, KeyIcon, PauseIcon, PencilSquareIcon, PlayIcon, TagIcon, TrashIcon } from '@heroicons/vue/20/solid'
+import { ArrowPathIcon, CloudArrowUpIcon, ChevronLeftIcon, KeyIcon, PauseIcon, PencilSquareIcon, PlayIcon, TagIcon, TrashIcon } from '@heroicons/vue/20/solid'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -12,6 +12,7 @@ import DeviceStatusTag from '@/components/DeviceStatusTag.vue'
 import PortsTab from '@/components/device/PortsTab.vue'
 import RenameDialog from '@/components/device/RenameDialog.vue'
 import SimpleTabs from '@/components/device/SimpleTabs.vue'
+import UiSpinner from '@/components/ui/UiSpinner.vue'
 import UiTime from '@/components/ui/UiTime.vue'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { useConfirm, useConfirmDelete } from '@/composables/useConfirm'
@@ -189,6 +190,19 @@ async function pushKeys(): Promise<void> {
   })
 }
 
+// Backup of just this switch (tab "Backups"); the list reloads when it is done.
+const { job: backupJob, watch: watchBackup } = useJobWatcher(() => fetchAll().catch(() => undefined))
+const backupRunning = computed(() => backupJob.value?.status === 'pending' || backupJob.value?.status === 'running')
+
+async function backupNow(): Promise<void> {
+  const d = device.value
+  if (!d) return
+  await notify.run(async () => {
+    watchBackup(await api.post<Job>('/jobs', { kind: 'backup', site_id: d.site_id, device_ids: [d.id] }))
+    notify.success(t('backups.started'))
+  })
+}
+
 async function remove(): Promise<void> {
   const d = device.value
   if (!d || !(await confirmDelete(d.name))) return
@@ -288,7 +302,16 @@ watch(() => props.id, load, { immediate: true })
       @changed="load"
     />
     <ConsoleTab v-else-if="tab === 'console'" :device-id="device.id" :model="device.model" />
-    <BackupList v-else-if="tab === 'backups'" :backups="backups" />
+    <div v-else-if="tab === 'backups'" class="space-y-4">
+      <div v-if="auth.can('backups.run', device.site_id)" class="flex justify-end">
+        <button type="button" class="btn btn-primary" :disabled="backupRunning" @click="backupNow">
+          <UiSpinner v-if="backupRunning" />
+          <CloudArrowUpIcon v-else class="size-4" />
+          {{ t('backups.nowDevice') }}
+        </button>
+      </div>
+      <BackupList :backups="backups" />
+    </div>
     <SimpleTabs v-else-if="tab !== 'details'" :tab="tab" :device-name="device.name" :vlans="vlans" :fdb="fdb" :lldp="lldp" :poll="poll" />
     <section v-else class="card">
       <dl class="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-3 dark:divide-white/5">

@@ -187,6 +187,8 @@ async def switch_ports(
                 "untagged_vlans": [v.vid for v in port.vlans if not v.tagged],
                 "tagged_count": sum(1 for v in port.vlans if v.tagged),
                 "poe": port.poe is not None,
+                # delivering | searching | disabled | fault, None without PoE
+                "poe_status": port.poe.value if port.poe is not None else None,
                 "neighbor": (
                     f"{neighbor.system_name or neighbor.chassis_id} ({neighbor.remote_port})"
                     if neighbor

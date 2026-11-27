@@ -3,7 +3,7 @@
  * The task list at the bottom of every page (like "Recent Tasks" in vCenter): recent jobs of
  * all visible sites, who started them, when, and how far they got. Folds down to one line.
  */
-import { CheckCircleIcon, ChevronDownIcon, ChevronUpIcon, ClockIcon, XCircleIcon } from '@heroicons/vue/20/solid'
+import { CheckCircleIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, ClockIcon, XCircleIcon } from '@heroicons/vue/20/solid'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Job } from '@/api/client'
@@ -54,6 +54,13 @@ const running = computed(() => store.jobs.filter((j) => j.status === 'running').
 const waiting = computed(() => store.jobs.filter((j) => j.status === 'pending').length)
 const latest = computed(() => store.jobs[0])
 const manySites = computed(() => sites.sites.length > 1)
+/** the job whose log is shown below its row */
+const expanded = ref<number | null>(null)
+/** failed switches are marked red in the log */
+const logLines = (job: Job): string[] => (job.log || '—').trimEnd().split('\n')
+const toggleLog = (job: Job): void => {
+  expanded.value = expanded.value === job.id ? null : job.id
+}
 
 const siteName = (job: Job): string => sites.sites.find((s) => s.id === job.site_id)?.name ?? '—'
 const icons = { done: CheckCircleIcon, failed: XCircleIcon, pending: ClockIcon } as const
@@ -110,33 +117,55 @@ function duration(job: Job): string {
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-white/5">
-          <tr v-for="job in store.jobs" :key="job.id" class="text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.03]">
-            <td class="py-1.5 pr-3 pl-4 font-medium whitespace-nowrap sm:pl-6 lg:pl-8">
-              <RouterLink :to="{ name: 'jobs', query: { job: job.id } }" class="hover:underline">{{ t(`jobs.kinds.${job.kind}`) }}</RouterLink>
-            </td>
-            <td class="max-w-xs truncate px-3 py-1.5" :title="job.summary">
-              <RouterLink v-if="job.device_id" :to="`/devices/${job.device_id}`" class="link font-normal">{{ job.summary }}</RouterLink>
-              <span v-else>{{ job.summary || '—' }}</span>
-            </td>
-            <td v-if="manySites" class="px-3 py-1.5 whitespace-nowrap">{{ siteName(job) }}</td>
-            <td class="px-3 py-1.5">
-              <div v-if="job.status === 'running'" class="flex items-center gap-2">
-                <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
-                  <div class="h-1.5 rounded-full bg-brand-500 transition-all" :style="{ width: `${Math.max(job.progress, 5)}%` }" />
-                </div>
-                <span class="w-9 text-right tabular-nums">{{ job.progress }} %</span>
-              </div>
-              <span v-else class="flex items-center gap-1.5" :title="job.error ?? undefined">
-                <component :is="icons[job.status as keyof typeof icons] ?? ClockIcon" class="size-4 shrink-0" :class="iconColor[job.status as keyof typeof iconColor]" />
-                <span class="truncate" :class="job.status === 'failed' && 'text-red-600 dark:text-red-400'">
-                  {{ job.status === 'failed' && job.error ? job.error : t(`jobs.statuses.${job.status}`) }}
+          <template v-for="job in store.jobs" :key="job.id">
+            <tr
+              class="cursor-pointer text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+              :title="t('tasks.showLog')"
+              :aria-expanded="expanded === job.id"
+              @click="toggleLog(job)"
+            >
+              <td class="py-1.5 pr-3 pl-4 font-medium whitespace-nowrap sm:pl-6 lg:pl-8">
+                <span class="inline-flex items-center gap-1">
+                  <ChevronDownIcon v-if="expanded === job.id" class="size-3.5 text-gray-400" />
+                  <ChevronRightIcon v-else class="size-3.5 text-gray-400" />
+                  {{ t(`jobs.kinds.${job.kind}`) }}
                 </span>
-              </span>
-            </td>
-            <td class="px-3 py-1.5 whitespace-nowrap">{{ job.created_by }}</td>
-            <td class="px-3 py-1.5 whitespace-nowrap"><UiTime :value="job.created_at" /></td>
-            <td class="py-1.5 pr-4 pl-3 whitespace-nowrap tabular-nums sm:pr-6 lg:pr-8">{{ duration(job) }}</td>
-          </tr>
+              </td>
+              <td class="max-w-xs truncate px-3 py-1.5" :title="job.summary">
+                <RouterLink v-if="job.device_id" :to="`/devices/${job.device_id}`" class="link font-normal" @click.stop>{{ job.summary }}</RouterLink>
+                <span v-else>{{ job.summary || '—' }}</span>
+              </td>
+              <td v-if="manySites" class="px-3 py-1.5 whitespace-nowrap">{{ siteName(job) }}</td>
+              <td class="px-3 py-1.5">
+                <div v-if="job.status === 'running'" class="flex items-center gap-2">
+                  <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
+                    <div class="h-1.5 rounded-full bg-brand-500 transition-all" :style="{ width: `${Math.max(job.progress, 5)}%` }" />
+                  </div>
+                  <span class="w-9 text-right tabular-nums">{{ job.progress }} %</span>
+                </div>
+                <span v-else class="flex items-center gap-1.5" :title="job.error ?? undefined">
+                  <component :is="icons[job.status as keyof typeof icons] ?? ClockIcon" class="size-4 shrink-0" :class="iconColor[job.status as keyof typeof iconColor]" />
+                  <span class="truncate" :class="job.status === 'failed' && 'text-red-600 dark:text-red-400'">
+                    {{ job.status === 'failed' && job.error ? job.error : t(`jobs.statuses.${job.status}`) }}
+                  </span>
+                </span>
+              </td>
+              <td class="px-3 py-1.5 whitespace-nowrap">{{ job.created_by }}</td>
+              <td class="px-3 py-1.5 whitespace-nowrap"><UiTime :value="job.created_at" /></td>
+              <td class="py-1.5 pr-4 pl-3 whitespace-nowrap tabular-nums sm:pr-6 lg:pr-8">{{ duration(job) }}</td>
+            </tr>
+            <tr v-if="expanded === job.id">
+              <td colspan="7" class="px-4 pb-2 sm:px-6 lg:px-8">
+                <pre class="max-h-48 overflow-auto rounded-md bg-gray-900 p-2.5 font-mono text-xs leading-relaxed text-gray-200"><span
+                v-for="(line, i) in logLines(job)"
+                :key="i"
+                :class="line.includes('FAILED') && 'text-red-400'"
+              >{{ line }}
+</span></pre>
+                <RouterLink :to="{ name: 'jobs', query: { job: job.id } }" class="link mt-1 inline-block">{{ t('tasks.openJob') }}</RouterLink>
+              </td>
+            </tr>
+          </template>
           <tr v-if="!store.jobs.length">
             <td colspan="7" class="py-4 text-center text-gray-500">{{ t('tasks.empty') }}</td>
           </tr>

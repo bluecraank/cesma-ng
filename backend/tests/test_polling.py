@@ -163,6 +163,47 @@ async def test_site_report(alice: AsyncClient, app, settings: Settings) -> None:
     assert report["backups"][0]["last_backup"] is None  # never backed up
 
 
+async def test_site_report_port_errors(alice: AsyncClient, app, settings: Settings) -> None:  # type: ignore[no-untyped-def]
+    """Errors per port over 24 h: growth between samples, a counter reset is skipped."""
+    from datetime import timedelta
+
+    from app.core.db import utcnow
+    from app.models import Port, PortCounterSample
+
+    settings = settings.model_copy(update={"snmp_simulator_dir": str(FIXTURES)})
+    device_id = await _device(alice, "dell-n1548p", "dell_n1500")
+    await _poll_all(app, device_id, settings)
+    site_id = (await alice.get(f"/devices/{device_id}")).json()["site_id"]
+    now = utcnow()
+    async with app.state.database.sessionmaker() as db:
+        await db.execute(PortCounterSample.__table__.delete())
+        ports = (await db.execute(select(Port).where(Port.device_id == device_id))).scalars()
+        p1, p2, p3, *_ = sorted(ports, key=lambda p: p.if_index)
+        series = {
+            # 3 + 4 errors; the sample from 2 days ago does not count
+            p1.id: [(48 * 60, 0, 100), (60, 10, 200), (30, 13, 300), (0, 17, 400)],
+            # switch restarted: 50 -> 2 is skipped, then 2 -> 5 counts
+            p2.id: [(60, 50, 900), (30, 2, 10), (0, 5, 20)],
+            # restarted and back at the same error count: still no errors in between
+            p3.id: [(60, 7, 900), (30, 7, 10), (0, 7, 20)],
+        }
+        for port_id, values in series.items():
+            for minutes, errors, octets in values:
+                db.add(
+                    PortCounterSample(
+                        port_id=port_id,
+                        sampled_at=now - timedelta(minutes=minutes),
+                        in_octets=octets,
+                        out_octets=octets,
+                        in_errors=errors,
+                        out_errors=0,
+                    )
+                )
+        await db.commit()
+    report = (await alice.get(f"/sites/{site_id}/reports")).json()
+    assert [(e["port"], e["errors"]) for e in report["errors"]] == [(p1.name, 7), (p2.name, 3)]
+
+
 async def test_device_address_from_ip_or_name() -> None:
     from app.services.addresses import resolve
 
