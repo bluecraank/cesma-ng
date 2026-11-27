@@ -8,6 +8,8 @@ Die Neuigkeiten in der Anwendung werden aus dieser Datei erzeugt.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-11-27
+
 ### Hinzugefügt
 
 - Switch-Seite, Reiter „Backups“: „Diesen Switch sichern“ startet ein Backup nur für diesen Switch. In der Auftragsleiste steht bei Backups einzelner Switches jetzt deren Name
